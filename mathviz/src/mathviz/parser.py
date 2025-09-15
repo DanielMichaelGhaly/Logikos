@@ -14,8 +14,8 @@ class MathParser:
     def __init__(self) -> None:
         """Initialize the parser with common patterns."""
         self.equation_patterns = [
+            r"solve\s+for\s+\w+:\s*(.+?)\s*=\s*(.+)",  # "solve for x: equation" pattern first
             r"(.+?)\s*=\s*(.+)",  # Basic equation pattern
-            r"solve\s+for\s+(\w+):\s*(.+)",  # "solve for x: equation" pattern
         ]
         
         self.variable_patterns = [
@@ -71,15 +71,29 @@ class MathParser:
         """Extract equations from the problem text."""
         equations = []
         
-        for pattern in self.equation_patterns:
-            matches = re.findall(pattern, text)
-            for match in matches:
-                if len(match) == 2:
-                    left_side, right_side = match
-                    equations.append(Equation(
-                        left_side=left_side.strip(),
-                        right_side=right_side.strip()
-                    ))
+        # Special handling for "solve for" pattern
+        solve_pattern = r"solve\s+for\s+\w+:\s*(.+?)\s*=\s*(.+)$"
+        solve_match = re.search(solve_pattern, text, re.IGNORECASE)
+        
+        if solve_match:
+            left_side, right_side = solve_match.groups()
+            equations.append(Equation(
+                left_side=left_side.strip(),
+                right_side=right_side.strip()
+            ))
+        else:
+            # Try other patterns
+            for pattern in self.equation_patterns:
+                if pattern.startswith("solve"):  # Skip the solve pattern as we handled it above
+                    continue
+                matches = re.findall(pattern, text)
+                for match in matches:
+                    if len(match) == 2:
+                        left_side, right_side = match
+                        equations.append(Equation(
+                            left_side=left_side.strip(),
+                            right_side=right_side.strip()
+                        ))
         
         return equations
 
