@@ -1,38 +1,78 @@
 """
-SymPy/NumPy ground-truth solver with step tracing.
+AI-Enhanced Mathematical Problem Solver with SymPy fallback and step tracing.
+Supports advanced calculus, optimization, and AI-powered problem solving.
 """
 
 import sympy as sp
 import numpy as np
 from typing import Dict, List, Any, Optional
+import logging
+
 from .schemas import MathProblem, MathSolution, Equation
 from .trace import StepTrace, Step
 from .reasoning import ReasoningGenerator
 from .viz import Visualizer
+try:
+    from .ai_apis import solve_with_ai, AIResponse
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+    print("AI APIs not available - using symbolic solver only")
+try:
+    from .advanced_calculus import AdvancedCalculus, OptimizationResult, GradientDescentResult
+    ADVANCED_CALCULUS_AVAILABLE = True
+except ImportError:
+    ADVANCED_CALCULUS_AVAILABLE = False
+    print("Advanced calculus module not available")
+
+logger = logging.getLogger(__name__)
 
 
 class MathSolver:
-    """Mathematical problem solver using SymPy for symbolic computation."""
+    """AI-Enhanced mathematical problem solver with SymPy fallback."""
 
-    def __init__(self):
+    def __init__(self, use_ai: bool = True, ai_first: bool = True):
         self.reasoner = ReasoningGenerator()
         self.visualizer = Visualizer()
         self.step_counter = 0
+        self.use_ai = use_ai and AI_AVAILABLE
+        self.ai_first = ai_first  # Try AI first, then fallback to symbolic
+        
+        if ADVANCED_CALCULUS_AVAILABLE:
+            self.advanced_calc = AdvancedCalculus()
+        else:
+            self.advanced_calc = None
+            
+        logger.info(f"MathSolver initialized - AI: {self.use_ai}, Advanced Calculus: {ADVANCED_CALCULUS_AVAILABLE}")
 
     def solve(self, problem: MathProblem) -> MathSolution:
-        """Solve a mathematical problem with step-by-step tracing."""
+        """Solve a mathematical problem with step-by-step tracing using AI and/or symbolic methods."""
         trace = StepTrace(problem_id=f"problem_{hash(problem.problem_text)}")
         self.step_counter = 0
         
         try:
+            # Try AI first if enabled
+            ai_solution = None
+            if self.use_ai and self.ai_first:
+                ai_solution = self._try_ai_solution(problem, trace)
+            
+            # Determine problem type and solve
             if problem.problem_type == "algebraic":
-                solution_data = self._solve_algebraic(problem, trace)
+                solution_data = self._solve_algebraic(problem, trace, ai_solution)
             elif problem.problem_type == "calculus":
-                solution_data = self._solve_calculus(problem, trace)
+                solution_data = self._solve_calculus(problem, trace, ai_solution)
             elif problem.problem_type == "optimization":
-                solution_data = self._solve_optimization(problem, trace)
+                solution_data = self._solve_optimization(problem, trace, ai_solution)
             else:
-                solution_data = self._solve_general(problem, trace)
+                solution_data = self._solve_general(problem, trace, ai_solution)
+            
+            # Try AI as fallback if symbolic failed and AI not tried yet
+            if (solution_data.get("status") == "not_implemented" or 
+                solution_data.get("error")) and self.use_ai and not ai_solution:
+                ai_fallback = self._try_ai_solution(problem, trace)
+                if ai_fallback and ai_fallback.success:
+                    solution_data["ai_fallback"] = ai_fallback.content
+                    solution_data["ai_provider"] = ai_fallback.provider
             
             # Generate reasoning and visualization
             reasoning = self.reasoner.generate_reasoning(trace)
@@ -58,9 +98,61 @@ class MathSolver:
                 visualization="",
                 metadata={"trace_id": trace.problem_id, "error": True}
             )
+    
+    def _try_ai_solution(self, problem: MathProblem, trace: StepTrace) -> Optional[Any]:
+        """Attempt to solve problem using AI APIs."""
+        if not self.use_ai:
+            return None
+        
+        try:
+            problem_type_map = {
+                "calculus": "differentiation" if "derivative" in problem.problem_text.lower() else "calculus",
+                "optimization": "optimization",
+                "algebraic": "algebra"
+            }
+            
+            ai_problem_type = problem_type_map.get(problem.problem_type, "general")
+            
+            self._add_step(trace, "ai_attempt", 
+                         problem.problem_text,
+                         "Attempting AI solution...",
+                         f"Trying to solve using AI with problem type: {ai_problem_type}")
+            
+            ai_response = solve_with_ai(problem.problem_text, ai_problem_type)
+            
+            if ai_response.success:
+                self._add_step(trace, "ai_solution",
+                             problem.problem_text,
+                             ai_response.content,
+                             f"AI solution from {ai_response.provider} (confidence: {ai_response.confidence:.2f})")
+                logger.info(f"AI solution successful: {ai_response.provider}")
+                return ai_response
+            else:
+                self._add_step(trace, "ai_failed",
+                             problem.problem_text,
+                             f"AI failed: {ai_response.error}",
+                             "AI solution attempt failed, falling back to symbolic methods")
+                logger.warning(f"AI solution failed: {ai_response.error}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"AI solution attempt error: {e}")
+            self._add_step(trace, "ai_error",
+                         problem.problem_text,
+                         f"AI error: {str(e)}",
+                         "AI solution encountered an error")
+            return None
 
-    def _solve_algebraic(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
-        """Solve algebraic equations using SymPy."""
+    def _solve_algebraic(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
+        """Solve algebraic equations using SymPy with optional AI assistance."""
+        
+        # If AI provided a solution, incorporate it
+        if ai_solution and ai_solution.success:
+            self._add_step(trace, "ai_integration",
+                         ai_solution.content,
+                         "Integrating AI solution with symbolic verification",
+                         f"Using AI solution from {ai_solution.provider} as guidance")
+        
         if not problem.equations:
             raise ValueError("No equations found in algebraic problem")
         
@@ -142,20 +234,38 @@ class MathSolver:
             "equations_solved": len(equations)
         }
 
-    def _solve_calculus(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
-        """Solve calculus problems (derivatives, integrals)."""
+    def _solve_calculus(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
+        """Solve calculus problems using advanced calculus module and AI assistance."""
+        
+        # If AI provided a solution, incorporate it
+        if ai_solution and ai_solution.success:
+            self._add_step(trace, "ai_calculus_guidance",
+                         ai_solution.content,
+                         "AI calculus solution available",
+                         f"AI guidance from {ai_solution.provider}")
+        
         # Extract the main expression from problem text
         problem_text = problem.problem_text.lower()
         
-        # Simple pattern matching for calculus operations
+        # Enhanced pattern matching for calculus operations
         if "derivative" in problem_text or "differentiate" in problem_text:
-            return self._solve_derivative(problem, trace)
+            if "partial" in problem_text and self.advanced_calc:
+                return self._solve_partial_derivative(problem, trace, ai_solution)
+            else:
+                return self._solve_derivative(problem, trace, ai_solution)
+        elif "gradient" in problem_text and self.advanced_calc:
+            return self._solve_gradient(problem, trace, ai_solution)
         elif "integral" in problem_text or "integrate" in problem_text:
-            return self._solve_integral(problem, trace)
+            return self._solve_integral(problem, trace, ai_solution)
+        elif "optimize" in problem_text or "critical points" in problem_text:
+            if self.advanced_calc:
+                return self._solve_optimization(problem, trace, ai_solution)
+            else:
+                raise ValueError("Optimization requires advanced calculus module")
         else:
             raise ValueError("Unrecognized calculus problem type")
     
-    def _solve_derivative(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
+    def _solve_derivative(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
         """Solve derivative problems."""
         # For now, handle simple cases - this could be expanded significantly
         import re
@@ -213,7 +323,7 @@ class MathSolver:
             "variable": "x"
         }
     
-    def _solve_integral(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
+    def _solve_integral(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
         """Solve integration problems."""
         import re
         
@@ -267,7 +377,7 @@ class MathSolver:
             "note": "Don't forget the constant of integration +C"
         }
 
-    def _solve_optimization(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
+    def _solve_optimization(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
         """Solve optimization problems."""
         # Placeholder for optimization - would implement constraint handling, Lagrange multipliers, etc.
         self._add_step(trace, "optimization_setup",
@@ -281,7 +391,7 @@ class MathSolver:
             "message": "Optimization solving not yet implemented"
         }
 
-    def _solve_general(self, problem: MathProblem, trace: StepTrace) -> Dict[str, Any]:
+    def _solve_general(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
         """Handle general mathematical problems."""
         self._add_step(trace, "general_analysis",
                      problem.problem_text,
@@ -324,3 +434,140 @@ class MathSolver:
         )
         trace.add_step(step)
         self.step_counter += 1
+    
+    def _solve_partial_derivative(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
+        """Solve partial derivative problems using advanced calculus."""
+        if not self.advanced_calc:
+            raise ValueError("Advanced calculus module not available")
+        
+        import re
+        text = problem.problem_text
+        
+        # Extract expression and variable
+        match = re.search(r"partial derivative of ([^,\.]+)(?:\s*with respect to|\s*w\.r\.t\.?)\s*([a-zA-Z]+)", text, re.IGNORECASE)
+        if not match:
+            raise ValueError("Could not extract expression and variable for partial differentiation")
+        
+        expr_str = match.group(1).strip()
+        variable = match.group(2).strip()
+        
+        self._add_step(trace, "parse_partial_derivative",
+                     text,
+                     f"Expression: {expr_str}, Variable: {variable}",
+                     "Extracted expression and variable for partial differentiation")
+        
+        # Use advanced calculus module
+        result = self.advanced_calc.compute_partial_derivative(expr_str, variable)
+        
+        if result.get("error"):
+            raise ValueError(result["error"])
+        
+        # Add advanced calculus steps to trace
+        for step in result["steps"]:
+            self._add_step(trace, step.step_type,
+                         step.input_expr,
+                         step.result,
+                         step.description)
+        
+        trace.final_state = f"∂/∂{variable}({expr_str}) = {result['derivative']}"
+        
+        return {
+            "type": "partial_derivative",
+            "original_expression": expr_str,
+            "derivative": result["derivative"],
+            "variable": variable,
+            "variables": result.get("variables", []),
+            "method": "advanced_calculus"
+        }
+    
+    def _solve_gradient(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
+        """Solve gradient problems using advanced calculus."""
+        if not self.advanced_calc:
+            raise ValueError("Advanced calculus module not available")
+        
+        import re
+        text = problem.problem_text
+        
+        # Extract expression
+        match = re.search(r"gradient of ([^,\.]+)", text, re.IGNORECASE)
+        if not match:
+            raise ValueError("Could not extract expression for gradient computation")
+        
+        expr_str = match.group(1).strip()
+        
+        self._add_step(trace, "parse_gradient",
+                     text,
+                     f"Expression for gradient: {expr_str}",
+                     "Extracted expression for gradient computation")
+        
+        # Use advanced calculus module
+        result = self.advanced_calc.compute_gradient(expr_str)
+        
+        if result.get("error"):
+            raise ValueError(result["error"])
+        
+        # Add advanced calculus steps to trace
+        for step in result["steps"]:
+            self._add_step(trace, step.step_type,
+                         step.input_expr,
+                         step.result,
+                         step.description)
+        
+        trace.final_state = f"∇({expr_str}) = {result['gradient']}"
+        
+        return {
+            "type": "gradient",
+            "original_expression": expr_str,
+            "gradient": result["gradient"],
+            "components": result["components"],
+            "variables": result["variables"],
+            "method": "advanced_calculus"
+        }
+    
+    def _solve_critical_points(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
+        """Find critical points using advanced calculus."""
+        if not self.advanced_calc:
+            raise ValueError("Advanced calculus module not available")
+        
+        import re
+        text = problem.problem_text
+        
+        # Extract expression
+        match = re.search(r"critical points of ([^,\.]+)", text, re.IGNORECASE)
+        if not match:
+            match = re.search(r"optimize ([^,\.]+)", text, re.IGNORECASE)
+        if not match:
+            raise ValueError("Could not extract expression for critical points")
+        
+        expr_str = match.group(1).strip()
+        
+        self._add_step(trace, "parse_optimization",
+                     text,
+                     f"Function to optimize: {expr_str}",
+                     "Extracted function for critical point analysis")
+        
+        # Use advanced calculus module
+        result = self.advanced_calc.find_critical_points(expr_str)
+        
+        # Add advanced calculus steps to trace
+        for step in result.steps:
+            self._add_step(trace, step.step_type,
+                         step.input_expr,
+                         step.result,
+                         step.description)
+        
+        if result.critical_points:
+            points_str = ", ".join([str(point) for point in result.critical_points])
+            trace.final_state = f"Critical points: {points_str}"
+        else:
+            trace.final_state = "No critical points found"
+        
+        return {
+            "type": "critical_points",
+            "original_expression": expr_str,
+            "critical_points": result.critical_points,
+            "function_values": result.function_values,
+            "gradient": str(result.gradient) if result.gradient else None,
+            "hessian": str(result.hessian) if result.hessian else None,
+            "method": "advanced_calculus"
+        }

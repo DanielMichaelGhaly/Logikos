@@ -1,5 +1,6 @@
 """
-Comprehensive visualization module supporting LaTeX, HTML, Plotly graphs, and animation preparation.
+Comprehensive visualization module supporting LaTeX, HTML, interactive graphs, Plotly visualization, and animation preparation.
+Integrates with graph visualization APIs for enhanced mathematical visualization.
 """
 
 import re
@@ -10,16 +11,34 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import logging
 
 from .trace import StepTrace, Step
 from .schemas import MathSolution
+try:
+    from .graph_visualizer import GraphVisualizer, GraphConfig, VisualizationResult
+    from .advanced_calculus import create_3d_function_plot, create_gradient_descent_animation
+    GRAPH_VISUALIZATION_AVAILABLE = True
+except ImportError:
+    GRAPH_VISUALIZATION_AVAILABLE = False
+    print("Graph visualization not available")
+
+logger = logging.getLogger(__name__)
 
 
 class Visualizer:
-    """Comprehensive visualization generator for mathematical solutions."""
+    """Comprehensive visualization generator for mathematical solutions with interactive graph capabilities."""
 
-    def __init__(self):
-        """Initialize with visualization templates and settings."""
+    def __init__(self, enable_interactive_graphs: bool = True):
+        """Initialize with visualization templates, settings, and graph visualization capabilities."""
+        self.enable_interactive_graphs = enable_interactive_graphs and GRAPH_VISUALIZATION_AVAILABLE
+        
+        if self.enable_interactive_graphs:
+            self.graph_visualizer = GraphVisualizer()
+        else:
+            self.graph_visualizer = None
+            
+        logger.info(f"Visualizer initialized - Interactive graphs: {self.enable_interactive_graphs}")
         self.latex_templates = {
             'equation_solve': r'''
 \begin{{align}}
@@ -84,6 +103,180 @@ class Visualizer:
         html_parts.extend(["</div>", "</div>"])
         
         return "\n".join(html_parts)
+    
+    def generate_interactive_graph(self, trace: StepTrace, solution: Optional[MathSolution] = None,
+                                 config: Optional[GraphConfig] = None) -> Optional[VisualizationResult]:
+        """Generate interactive graph visualization using graph visualization APIs."""
+        if not self.enable_interactive_graphs or not self.graph_visualizer:
+            logger.warning("Interactive graph visualization not available")
+            return None
+        
+        try:
+            problem_type = self._identify_problem_type(trace)
+            expressions = self._extract_expressions_from_trace(trace, solution)
+            
+            if not expressions:
+                logger.warning("No expressions found for graph visualization")
+                return None
+            
+            if config is None:
+                config = GraphConfig()
+            
+            # Generate appropriate visualization based on problem type
+            if problem_type == 'derivative':
+                return self._generate_derivative_graph(expressions, config)
+            elif problem_type == 'integral':
+                return self._generate_integral_graph(expressions, config)
+            elif len(expressions) == 1 and self._is_multivariable_function(expressions[0]):
+                return self._generate_3d_function_graph(expressions[0], config)
+            else:
+                return self._generate_function_graph(expressions, config)
+                
+        except Exception as e:
+            logger.error(f"Error generating interactive graph: {e}")
+            return None
+    
+    def generate_optimization_graph(self, expression: str, critical_points: List[Tuple[float, float]] = None,
+                                  config: Optional[GraphConfig] = None) -> Optional[VisualizationResult]:
+        """Generate interactive graph for optimization problems."""
+        if not self.enable_interactive_graphs or not self.graph_visualizer:
+            return None
+        
+        try:
+            if config is None:
+                config = GraphConfig()
+            
+            return self.graph_visualizer.visualize_optimization(expression, critical_points, config)
+            
+        except Exception as e:
+            logger.error(f"Error generating optimization graph: {e}")
+            return None
+    
+    def generate_desmos_url(self, expressions: List[str], config: Optional[GraphConfig] = None) -> Optional[str]:
+        """Generate Desmos URL for expressions."""
+        if not self.enable_interactive_graphs or not self.graph_visualizer:
+            return None
+        
+        try:
+            result = self.graph_visualizer.visualize_functions(expressions, config, "desmos")
+            return result.graph_url if result.success else None
+        except Exception as e:
+            logger.error(f"Error generating Desmos URL: {e}")
+            return None
+    
+    def _extract_expressions_from_trace(self, trace: StepTrace, solution: Optional[MathSolution] = None) -> List[str]:
+        """Extract mathematical expressions suitable for graphing from trace."""
+        expressions = []
+        
+        # Look for expressions in the trace steps
+        for step in trace.steps:
+            # For derivative problems, include both original and derivative
+            if step.operation == 'differentiate':
+                # Try to extract clean expressions
+                before_expr = self._clean_expression_for_graphing(step.expression_before)
+                after_expr = self._clean_expression_for_graphing(step.expression_after)
+                
+                if before_expr:
+                    expressions.append(before_expr)
+                if after_expr:
+                    expressions.append(after_expr)
+            
+            # For parsing steps, look for main expressions
+            elif step.operation in ['parse_expression', 'symbolic_conversion']:
+                expr = self._clean_expression_for_graphing(step.expression_after)
+                if expr:
+                    expressions.append(expr)
+        
+        # If no expressions found in steps, try to extract from solution
+        if not expressions and solution:
+            if hasattr(solution, 'final_answer'):
+                if isinstance(solution.final_answer, dict):
+                    for key, value in solution.final_answer.items():
+                        if 'expression' in key.lower() or 'derivative' in key.lower():
+                            expr = self._clean_expression_for_graphing(str(value))
+                            if expr:
+                                expressions.append(expr)
+        
+        # Remove duplicates while preserving order
+        unique_expressions = []
+        for expr in expressions:
+            if expr not in unique_expressions:
+                unique_expressions.append(expr)
+        
+        return unique_expressions
+    
+    def _clean_expression_for_graphing(self, expression: str) -> Optional[str]:
+        """Clean and validate expression for graphing."""
+        if not expression or not isinstance(expression, str):
+            return None
+        
+        # Remove common text patterns that aren't mathematical expressions
+        skip_patterns = [
+            'step', 'solution', 'equation', 'original', 'parsing', 'converting', 
+            'applying', 'simplifying', '=', 'solve', 'find', 'derivative of'
+        ]
+        
+        cleaned = expression.lower().strip()
+        for pattern in skip_patterns:
+            if pattern in cleaned and len(cleaned) < 50:  # Likely descriptive text
+                return None
+        
+        # Extract mathematical expressions from text
+        # Look for patterns like "f(x) = x^2" or just "x^2"
+        import re
+        
+        # Pattern for function definition
+        func_pattern = r'f\(x\)\s*=\s*(.+)'
+        match = re.search(func_pattern, expression, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern for expressions that look mathematical
+        math_pattern = r'([x\^\+\-\*\/\(\)\d\w\s]+)'
+        if re.search(r'[x\^\+\-\*\/]', expression):  # Contains mathematical operators
+            # Try to clean up the expression
+            cleaned = re.sub(r'\s+', ' ', expression)  # Normalize whitespace
+            if len(cleaned) < 100 and 'x' in cleaned:  # Reasonable length and contains variable
+                return cleaned
+        
+        return None
+    
+    def _is_multivariable_function(self, expression: str) -> bool:
+        """Check if expression contains multiple variables for 3D plotting."""
+        try:
+            expr = sp.sympify(expression)
+            variables = expr.free_symbols
+            return len(variables) >= 2
+        except:
+            # Simple heuristic check
+            return 'y' in expression.lower() and 'x' in expression.lower()
+    
+    def _generate_derivative_graph(self, expressions: List[str], config: GraphConfig) -> Optional[VisualizationResult]:
+        """Generate graph for derivative problems."""
+        if len(expressions) >= 2:
+            # Assume first is original function, second is derivative
+            original_expr = expressions[0]
+            return self.graph_visualizer.visualize_derivative(original_expr, config=config)
+        elif len(expressions) == 1:
+            # Try to compute derivative and visualize
+            return self.graph_visualizer.visualize_derivative(expressions[0], config=config)
+        else:
+            return None
+    
+    def _generate_integral_graph(self, expressions: List[str], config: GraphConfig) -> Optional[VisualizationResult]:
+        """Generate graph for integral problems."""
+        if expressions:
+            # For integrals, visualize the integrand
+            return self.graph_visualizer.visualize_function(expressions[0], config)
+        return None
+    
+    def _generate_function_graph(self, expressions: List[str], config: GraphConfig) -> Optional[VisualizationResult]:
+        """Generate graph for general functions."""
+        return self.graph_visualizer.visualize_functions(expressions, config)
+    
+    def _generate_3d_function_graph(self, expression: str, config: GraphConfig) -> Optional[VisualizationResult]:
+        """Generate 3D graph for multivariable functions."""
+        return self.graph_visualizer.visualize_3d_function(expression, config=config)
 
     def generate_plotly_figure(self, trace: StepTrace, solution: Optional[MathSolution] = None) -> Optional[go.Figure]:
         """Generate interactive Plotly visualization."""
