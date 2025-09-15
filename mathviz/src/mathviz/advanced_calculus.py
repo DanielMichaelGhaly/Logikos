@@ -49,6 +49,16 @@ class AdvancedCalculus:
     def __init__(self):
         self.steps = []
     
+    def _add_step(self, operation: str, before: str, after: str, justification: str) -> None:
+        """Helper method to add a step with consistent format."""
+        self.steps.append(Step(
+            step_id=len(self.steps),
+            operation=operation,
+            expression_before=before,
+            expression_after=after,
+            justification=justification
+        ))
+    
     def compute_partial_derivative(self, expression: str, variable: str, 
                                  variables: List[str] = None) -> Dict[str, Any]:
         """Compute partial derivative of expression with respect to variable"""
@@ -63,33 +73,33 @@ class AdvancedCalculus:
             expr = sp.sympify(expression)
             var = sp.Symbol(variable)
             
-            self.steps.append(Step(
-                step_type="setup",
-                description=f"Computing partial derivative of {expression} with respect to {variable}",
-                input_expr=expression,
-                result=str(expr)
-            ))
+            self._add_step(
+                "setup",
+                expression,
+                str(expr),
+                f"Computing partial derivative of {expression} with respect to {variable}"
+            )
             
             # Compute partial derivative
             partial_deriv = sp.diff(expr, var)
             
-            self.steps.append(Step(
-                step_type="differentiation",
-                description=f"Apply partial differentiation rules",
-                input_expr=str(expr),
-                result=str(partial_deriv)
-            ))
+            self._add_step(
+                "differentiation",
+                str(expr),
+                str(partial_deriv),
+                "Apply partial differentiation rules"
+            )
             
             # Simplify result
             simplified = sp.simplify(partial_deriv)
             
             if simplified != partial_deriv:
-                self.steps.append(Step(
-                    step_type="simplification",
-                    description="Simplify the result",
-                    input_expr=str(partial_deriv),
-                    result=str(simplified)
-                ))
+                self._add_step(
+                    "simplification",
+                    str(partial_deriv),
+                    str(simplified),
+                    "Simplify the result"
+                )
             
             return {
                 "derivative": str(simplified),
@@ -100,12 +110,12 @@ class AdvancedCalculus:
             }
             
         except Exception as e:
-            self.steps.append(Step(
-                step_type="error",
-                description=f"Error computing partial derivative: {str(e)}",
-                input_expr=expression,
-                result=""
-            ))
+            self._add_step(
+                "error",
+                expression,
+                "",
+                f"Error computing partial derivative: {str(e)}"
+            )
             return {
                 "derivative": None,
                 "error": str(e),
@@ -123,12 +133,12 @@ class AdvancedCalculus:
                 variables = list(expr.free_symbols)
                 variables = [str(v) for v in sorted(variables, key=str)]
             
-            self.steps.append(Step(
-                step_type="setup",
-                description=f"Computing gradient of {expression} with respect to variables {variables}",
-                input_expr=expression,
-                result=str(expr)
-            ))
+            self._add_step(
+                "setup",
+                expression,
+                str(expr),
+                f"Computing gradient of {expression} with respect to variables {variables}"
+            )
             
             # Compute partial derivatives for each variable
             gradient_components = []
@@ -137,22 +147,22 @@ class AdvancedCalculus:
                 partial = sp.diff(expr, var)
                 gradient_components.append(partial)
                 
-                self.steps.append(Step(
-                    step_type="partial_derivative",
-                    description=f"∂f/∂{var_name} = {partial}",
-                    input_expr=str(expr),
-                    result=str(partial)
-                ))
+                self._add_step(
+                    "partial_derivative",
+                    str(expr),
+                    str(partial),
+                    f"∂f/∂{var_name} = {partial}"
+                )
             
             # Create gradient vector
             gradient = sp.Matrix(gradient_components)
             
-            self.steps.append(Step(
-                step_type="gradient",
-                description=f"Gradient vector: ∇f = {gradient}",
-                input_expr=str(expr),
-                result=str(gradient)
-            ))
+            self._add_step(
+                "gradient",
+                str(expr),
+                str(gradient),
+                f"Gradient vector: ∇f = {gradient}"
+            )
             
             return {
                 "gradient": str(gradient),
@@ -163,12 +173,12 @@ class AdvancedCalculus:
             }
             
         except Exception as e:
-            self.steps.append(Step(
-                step_type="error",
-                description=f"Error computing gradient: {str(e)}",
-                input_expr=expression,
-                result=""
-            ))
+            self._add_step(
+                "error",
+                expression,
+                "",
+                f"Error computing gradient: {str(e)}"
+            )
             return {
                 "gradient": None,
                 "error": str(e),
