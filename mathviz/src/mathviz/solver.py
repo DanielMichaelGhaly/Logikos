@@ -418,8 +418,9 @@ class MathSolver:
         # Pattern: closing parenthesis followed by letter or opening parenthesis
         expr = re.sub(r'\)([a-zA-Z(])', r')*\1', expr)
         
-        # Pattern: letter followed by opening parenthesis
-        expr = re.sub(r'([a-zA-Z])\(', r'\1*(', expr)
+        # Pattern: letter followed by opening parenthesis, but avoid function calls like sin(x), cos(x), ln(x)
+        # Only insert * when a single-letter identifier is followed by '(' and is not part of a longer name
+        expr = re.sub(r'(?<![a-zA-Z])([a-zA-Z])\(', r'\1*(', expr)
         
         return expr
 

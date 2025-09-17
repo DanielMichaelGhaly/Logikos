@@ -48,7 +48,7 @@ class MathParser:
             return "calculus"
         elif any(word in text_lower for word in ["maximize", "minimize", "optimal"]):
             return "optimization"
-        elif any(word in text_lower for word in ["solve", "equation", "="]):
+        elif any(word in text_lower for word in ["solve", "equation", "=", "roots", "root", "zeros", "zeroes", "factors", "factor"]):
             return "algebraic"
         else:
             return "general"
@@ -82,18 +82,40 @@ class MathParser:
                 right_side=right_side.strip()
             ))
         else:
-            # Try other patterns
-            for pattern in self.equation_patterns:
-                if pattern.startswith("solve"):  # Skip the solve pattern as we handled it above
-                    continue
-                matches = re.findall(pattern, text)
-                for match in matches:
-                    if len(match) == 2:
-                        left_side, right_side = match
-                        equations.append(Equation(
-                            left_side=left_side.strip(),
-                            right_side=right_side.strip()
-                        ))
+            # Handle "find the roots of <expr>" or similar phrasing
+            roots_patterns = [
+                r"find\s+the\s+roots\s+of\s+(.+)$",
+                r"find\s+roots\s+of\s+(.+)$",
+                r"roots\s+of\s+(.+)$",
+                r"find\s+the\s+zeros\s+of\s+(.+)$",
+                r"find\s+zeros\s+of\s+(.+)$",
+                r"zeros\s+of\s+(.+)$",
+            ]
+            matched_expr = None
+            for pattern in roots_patterns:
+                m = re.search(pattern, text, re.IGNORECASE)
+                if m:
+                    matched_expr = m.group(1).strip()
+                    break
+            if matched_expr:
+                # Convert to an equation "expr = 0"
+                equations.append(Equation(
+                    left_side=matched_expr,
+                    right_side="0"
+                ))
+            else:
+                # Try other patterns
+                for pattern in self.equation_patterns:
+                    if pattern.startswith("solve"):  # Skip the solve pattern as we handled it above
+                        continue
+                    matches = re.findall(pattern, text)
+                    for match in matches:
+                        if len(match) == 2:
+                            left_side, right_side = match
+                            equations.append(Equation(
+                                left_side=left_side.strip(),
+                                right_side=right_side.strip()
+                            ))
         
         return equations
 
