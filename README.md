@@ -1,171 +1,211 @@
-# MathViz: Problem Solver AI
+# Logikos - AI-Enhanced Mathematical Problem Solver
 
-MathViz is an AI-powered framework for solving, explaining, and visualizing problems in **math, physics, and chemistry**.  
-The system takes a natural language problem as input, parses it into a structured **intermediate representation (JSON schema)**, validates the data, solves it symbolically/numerically, generates step-by-step reasoning, and produces **visualizations and interactive simulations**.
+**🔧 Restructured Architecture** - Clean separation of AI, SymPy verification, and visualization components for better collaboration and maintainability.
+
+## Overview
+
+Logikos combines AI-powered mathematical explanations with SymPy's symbolic computation for accurate and educational problem solving. The system provides:
+
+- **🤖 AI Explanations**: Step-by-step solutions using Qwen 2.5 32B model
+- **🔢 SymPy Verification**: Mathematical accuracy guaranteed by symbolic computation
+- **✅ Cross-Validation**: AI solutions are automatically verified against SymPy results
+- **📊 Rich Visualization**: LaTeX formatting and interactive displays
+
+## Quick Start
+
+### Prerequisites
+- Python 3.8+
+- Virtual environment (recommended)
+- Ollama (for AI features, optional)
+
+### Installation
+
+1. **Activate virtual environment**:
+   ```bash
+   source .venv/bin/activate
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Test the system**:
+   ```bash
+   python run_workflow.py "solve 2x+5=0" --no-ai
+   ```
+
+## Usage Examples
+
+### Basic Problem Solving
+```bash
+# Solve algebraic equations
+python run_workflow.py "solve 2x+5=0"
+
+# Find roots of polynomials  
+python run_workflow.py "find roots of x^2-4"
+
+# Calculus operations
+python run_workflow.py "derivative of x^2 + 3x"
+python run_workflow.py "integral of sin(x)"
+
+# Expression simplification
+python run_workflow.py "simplify (x^2-1)/(x-1)"
+```
+
+### Advanced Options
+```bash
+# Disable AI (SymPy only)
+python run_workflow.py "solve x^2-9=0" --no-ai
+
+# Verbose output with detailed steps
+python run_workflow.py "derivative of cos(x)" --verbose
+
+# Save HTML visualization
+python run_workflow.py "solve 3x-7=0" --save-html solution.html
+
+# Save JSON results  
+python run_workflow.py "integral of x^2" --save-json results.json
+```
+
+## Architecture
+
+```
+Logikos/
+├── run_workflow.py          # Main entry point
+├── requirements.txt         # Dependencies
+├── README.md               # This file
+├── ai/                     # AI processing components
+│   ├── qwen_solver.py      # Qwen model interface
+│   └── response_parser.py  # Parse AI responses
+├── sympy_backend/          # Mathematical verification
+│   ├── expression_parser.py # Enhanced math parsing
+│   ├── solver.py          # SymPy solving logic
+│   └── verifier.py        # AI/SymPy cross-validation
+├── visualization/          # Display and formatting
+│   ├── latex_formatter.py # LaTeX output
+│   └── step_visualizer.py # Step-by-step display
+└── tests/                 # Integration tests
+    └── test_integration.py
+```
+
+### Key Components
+
+#### 1. Enhanced Math Parser (`sympy_backend/expression_parser.py`)
+**✅ FIXED**: Now correctly handles natural language input like "solve 2x+5=0"
+
+- Converts natural language to SymPy expressions
+- Supports various input formats (equations, derivatives, integrals)
+- Robust preprocessing for mathematical notation
+
+#### 2. SymPy Solver (`sympy_backend/solver.py`) 
+- Pure symbolic computation for mathematical accuracy
+- Detailed step-by-step solving process
+- LaTeX output generation
+
+#### 3. AI Integration (`ai/qwen_solver.py`)
+- Interface to Qwen 2.5 32B model via Ollama
+- Contextual prompts for different problem types
+- Graceful fallback when AI unavailable
+
+#### 4. Verification System (`sympy_backend/verifier.py`)
+**✅ NEW**: Cross-validates AI solutions against SymPy results
+
+- Extracts numerical solutions from AI responses
+- Compares against SymPy results with tolerance
+- Confidence scoring and error detection
+
+## Problem Types Supported
+
+| Type | Example Input | SymPy Support | AI Support |
+|------|---------------|---------------|------------|
+| **Linear Equations** | `solve 2x+5=0` | ✅ | ✅ |
+| **Quadratic Equations** | `solve x^2-4=0` | ✅ | ✅ |
+| **Root Finding** | `find roots of x^3-8` | ✅ | ✅ |
+| **Derivatives** | `derivative of x^2+sin(x)` | ✅ | ✅ |
+| **Integrals** | `integral of cos(x)` | ✅ | ✅ |
+| **Simplification** | `simplify (x^2-1)/(x-1)` | ✅ | ✅ |
+
+## Verification System
+
+The system automatically cross-validates AI solutions:
+
+```
+🤖 AI: "x = -2.5"
+🔢 SymPy: [-5/2]
+✅ Verification: MATCH (confidence: 0.95)
+```
+
+Status indicators:
+- ✅ **MATCH**: AI solution matches SymPy exactly
+- ❌ **MISMATCH**: Solutions differ (potential AI error)
+- ⚠️ **PARTIAL_MATCH**: Similar but not exact
+- ❓ **INCONCLUSIVE**: Cannot verify (complex expressions)
+
+## Development
+
+### Running Tests
+```bash
+# Basic integration test
+python tests/test_integration.py
+
+# Full test suite (if pytest installed)
+pytest tests/ -v
+```
+
+### Project Structure Benefits
+- **🔧 Modular**: Each component can be developed independently
+- **🧰 Testable**: Clear interfaces enable comprehensive testing
+- **🚀 Scalable**: Easy to add new AI models or math operations
+- **👥 Collaborative**: Team members can work on specific components
+
+### Adding New Features
+
+#### New Math Operations
+1. Add parsing patterns to `sympy_backend/expression_parser.py`
+2. Implement solver logic in `sympy_backend/solver.py`
+3. Add verification patterns to `sympy_backend/verifier.py`
+
+#### New AI Models
+1. Create new solver class in `ai/` directory
+2. Implement same interface as `QwenSolver`
+3. Update `run_workflow.py` to support new model
+
+## Troubleshooting
+
+### Common Issues
+
+**"SymPy error: Sympify of expression 'could not parse'"**
+- ✅ **FIXED**: Enhanced parser now handles natural language input
+- Use proper mathematical notation: `2*x` instead of `2x` in complex expressions
+
+**"Ollama service not available"**
+- Start Ollama: `ollama serve`
+- Or use `--no-ai` flag for SymPy-only mode
+
+**Import errors**
+- Ensure virtual environment is activated: `source .venv/bin/activate`
+- Install dependencies: `pip install -r requirements.txt`
+
+### Getting Help
+- Check the integration tests for usage examples
+- Use `--verbose` flag for detailed debugging output
+- Each component has standalone test functions
+
+## Original vs. New Architecture
+
+### Before (Issues)
+- ❌ Parser failed on "solve 2x+5=0"
+- ❌ Multiple overlapping scripts and directories
+- ❌ No systematic AI-SymPy verification
+- ❌ Difficult for team collaboration
+
+### After (Solutions)
+- ✅ Enhanced parser handles natural language
+- ✅ Clean modular architecture
+- ✅ Automatic AI-SymPy cross-validation
+- ✅ Clear separation of concerns for collaboration
 
 ---
 
-## 🔹 Core Idea
-The project bridges **textual problem descriptions** and **interactive visual understanding**:
-1. **User Input (NL prompt)** → converted to **structured JSON schema**.
-2. **Validation Layer** ensures physical/mathematical sanity (units, domains, negative numbers, etc.).
-3. **Solver Layer** computes solutions using SymPy/NumPy and produces a **step trace**.
-4. **Step Generator** transforms the solver trace into human-readable reasoning.
-5. **Visualization Builder** creates LaTeX equations, 2D/3D graphs, and optional physics simulations.
-6. **Frontend** renders answers, reasoning, and visualizations with interactive feedback (revise/resolve loop).
-
----
-
-## 🔹 Architecture
-
-
-mathviz/
-├─ pyproject.toml
-├─ README.md
-└─ src/
-└─ mathviz/
-├─ init.py        # package init
-├─ pipeline.py        # orchestration of all steps
-├─ schemas.py         # Pydantic models (problem JSON schema)
-├─ parser.py          # prompt → schema (rules/regex/LLM hook)
-├─ validator.py       # sanity checks (domains, units)
-├─ solver.py          # SymPy/NumPy solver + step trace
-├─ trace.py           # Step + StepTrace dataclasses
-├─ reasoning.py       # explanation generator from trace
-└─ viz.py             # visualization builder (LaTeX/HTML/Plotly/Manim)
-
----
-
-## 🔹 Pipeline
-
-1. **Parsing & Schema**  
-   - Convert user prompt → JSON schema.  
-   - Enforce schema with Pydantic.  
-   - Optionally use an LLM or lightweight regex/rule parser.
-
-2. **Validation**  
-   - Check numeric domains, units, and variable consistency.  
-   - Python libraries: `pint` for units, custom domain checks.
-
-3. **Solver**  
-   - Symbolic math with **SymPy** (algebra, differentiation, integration).  
-   - Numerical math with **NumPy**.  
-   - Produces **step traces** for later reasoning.
-
-4. **Step Generator**  
-   - Rule-based text generator (future: LLM-enhanced).  
-   - Converts solver traces → step-by-step reasoning.
-
-5. **Visualization**  
-   - **Math rendering:** LaTeX (KaTeX/MathJax).  
-   - **2D Graphs:** Plotly.js.  
-   - **Physics Simulations:** matter.js / planck.js.  
-   - **Animations:** Manim or TikZ.  
-   - Optional: 3D scenes with three.js.
-
-6. **Frontend**  
-   - Framework: **React + TypeScript + TailwindCSS**.  
-   - Features:  
-     - Problem editor with schema validation.  
-     - Interactive visualizations.  
-     - Simulator controls (play, pause, reset).  
-
-7. **Backend**  
-   - **FastAPI** orchestrating pipeline steps.  
-   - Data storage: **Postgres** (structured problems) or **Vector DB** for retrieval-augmented generation (formulas, constants).  
-
----
-
-## 🔹 Example Flow
-
-1. User asks:  
-   > "Find the roots of x² - 5x + 6 and plot the function."
-
-2. System converts → JSON:
-   ```json
-   {
-     "problem_type": "polynomial",
-     "equation": "x^2 - 5x + 6",
-     "goal": "roots",
-     "visualize": true
-   }
-
-3.	Validation checks input.
-
-4.	Solver uses SymPy → roots = [2, 3].
-
-5.	Step Generator explains factoring:
-    •	“We can factor x² - 5x + 6 as (x - 2)(x - 3). The roots are 2 and 3.”
-
-6.	Visualization produces:
-	•	Equation in LaTeX.
-	•	2D plot with marked roots.
-
-🔹 Roadmap
-	•	Implement JSON schema parser.
-	•	Add validation layer with units/domain checks.
-	•	Build solver + step tracer with SymPy/NumPy.
-	•	Generate rule-based reasoning text.
-	•	Integrate LaTeX + Plotly.js visualization.
-	•	Build React + Tailwind frontend.
-	•	Add optional physics simulator (matter.js).
-	•	Extend to chemistry and physics problem types.
-
-⸻
-
-🔹 Tech Stack
-	•	Backend: FastAPI, Pydantic, SymPy, NumPy, Pint
-	•	Frontend: React, TypeScript, Tailwind, Plotly.js, KaTeX/MathJax, Manim, matter.js
-	•	Storage: Postgres + VectorDB (for RAG)
-	•	Language Layer: Rule parser + optional LLM (fine-tuned or external API)
-
-⸻
-
-🔹 Output to User
-	•	Answer (numeric/symbolic)
-	•	Step-by-step reasoning
-	•	Visualizations (graphs, diagrams, simulations)
-	•	Interactive simulator (optional for physics/chemistry)
-
----
-
-# 2. Initialization Prompt
-
-Here’s a **prompt** you can paste into an AI assistant to bootstrap the project:
-
-```plaintext
-You are building a project called **MathViz**, an AI-powered problem solver for math, physics, and chemistry.  
-
-Project requirements:
-- Input: natural language problem.
-- Parse into JSON schema (via regex/rules/LLM).
-- Validate inputs (units, domains, numeric sanity).
-- Solve problem using SymPy/NumPy (algebra, calculus, numerical).
-- Generate step-by-step reasoning from solver trace.
-- Visualize results using LaTeX (math), Plotly.js (2D plots), and optionally Manim/matter.js (animations, physics sims).
-- Frontend: React + TypeScript + TailwindCSS.
-- Backend: FastAPI with orchestration pipeline.
-- Data storage: Postgres or Vector DB for RAG.
-
-Project structure (Python backend):
-
-mathviz/
-├─ pyproject.toml
-├─ README.md
-└─ src/mathviz/
-├─ init.py
-├─ pipeline.py
-├─ schemas.py
-├─ parser.py
-├─ validator.py
-├─ solver.py
-├─ trace.py
-├─ reasoning.py
-└─ viz.py
-
-Tasks to initialize:
-1. Generate `pyproject.toml` with dependencies (FastAPI, Pydantic, SymPy, NumPy, Pint).  
-2. Scaffold `src/mathviz/` files with stub functions/classes.  
-3. Add README.md with project description.  
-4. Ensure all modules importable and pipeline skeleton runs with dummy flow.  
-
+**🎯 Ready to use**: The core SymPy functionality works immediately. AI features require Ollama setup but gracefully degrade when unavailable.

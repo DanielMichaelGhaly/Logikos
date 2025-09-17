@@ -9,12 +9,30 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class Step:
     """A single step in a mathematical solution."""
-    step_id: int
+    step_id: str
+    description: str
     operation: str  # add, subtract, multiply, divide, substitute, etc.
-    expression_before: str
-    expression_after: str
-    justification: str
+    input_state: Dict[str, Any]
+    output_state: Dict[str, Any]
+    reasoning: str
+    rule_formula: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    
+    # Legacy support for old interface
+    @property
+    def expression_before(self) -> str:
+        """Legacy property for backward compatibility."""
+        return self.input_state.get("expression", "")
+    
+    @property
+    def expression_after(self) -> str:
+        """Legacy property for backward compatibility."""
+        return self.output_state.get("expression", "")
+    
+    @property
+    def justification(self) -> str:
+        """Legacy property for backward compatibility."""
+        return self.reasoning
 
 
 @dataclass
@@ -31,7 +49,7 @@ class StepTrace:
         """Add a step to the trace."""
         self.steps.append(step)
     
-    def get_step(self, step_id: int) -> Optional[Step]:
+    def get_step(self, step_id: str) -> Optional[Step]:
         """Get a step by its ID."""
         for step in self.steps:
             if step.step_id == step_id:

@@ -52,11 +52,12 @@ class AdvancedCalculus:
     def _add_step(self, operation: str, before: str, after: str, justification: str) -> None:
         """Helper method to add a step with consistent format."""
         self.steps.append(Step(
-            step_id=len(self.steps),
+            step_id=str(len(self.steps)),
+            description=justification,
             operation=operation,
-            expression_before=before,
-            expression_after=after,
-            justification=justification
+            input_state={"expression": before},
+            output_state={"expression": after},
+            reasoning=justification
         ))
     
     def compute_partial_derivative(self, expression: str, variable: str, 
@@ -196,12 +197,15 @@ class AdvancedCalculus:
                 variables = list(expr.free_symbols)
                 variables = [str(v) for v in sorted(variables, key=str)]
             
-            self.steps.append(Step(
-                step_type="setup",
+            step = Step(
+                step_id=str(len(self.steps)),
                 description=f"Finding critical points of {expression}",
-                input_expr=expression,
-                result=str(expr)
-            ))
+                operation="setup",
+                input_state={"expression": expression},
+                output_state={"expression": str(expr)},
+                reasoning=f"Finding critical points of {expression}"
+            )
+            self.steps.append(step)
             
             # Compute gradient
             gradient_result = self.compute_gradient(expression, variables)
@@ -211,12 +215,15 @@ class AdvancedCalculus:
             gradient = gradient_result["gradient_matrix"]
             
             # Set gradient equal to zero and solve
-            self.steps.append(Step(
-                step_type="critical_point_setup",
+            step = Step(
+                step_id=str(len(self.steps)),
                 description="Set gradient equal to zero: ∇f = 0",
-                input_expr=str(gradient),
-                result="System of equations to solve"
-            ))
+                operation="critical_point_setup",
+                input_state={"expression": str(gradient)},
+                output_state={"expression": "System of equations to solve"},
+                reasoning="Set gradient equal to zero: ∇f = 0"
+            )
+            self.steps.append(step)
             
             # Solve the system of equations
             sym_vars = [sp.Symbol(var) for var in variables]
@@ -241,24 +248,30 @@ class AdvancedCalculus:
                         func_val = float(expr.subs(sol))
                         function_values.append(func_val)
                         
-                        self.steps.append(Step(
-                            step_type="critical_point",
+                        step = Step(
+                            step_id=str(len(self.steps)),
                             description=f"Critical point found: {point} with f = {func_val:.4f}",
-                            input_expr=str(equations),
-                            result=f"Point: {point}, Value: {func_val:.4f}"
-                        ))
+                            operation="critical_point",
+                            input_state={"expression": str(equations)},
+                            output_state={"expression": f"Point: {point}, Value: {func_val:.4f}"},
+                            reasoning=f"Critical point found: {point} with f = {func_val:.4f}"
+                        )
+                        self.steps.append(step)
             
             # Compute Hessian for classification
             hessian = None
             if len(variables) <= 3:  # Only for manageable dimensions
                 try:
                     hessian = sp.hessian(expr, sym_vars)
-                    self.steps.append(Step(
-                        step_type="hessian",
+                    step = Step(
+                        step_id=str(len(self.steps)),
                         description=f"Hessian matrix computed: {hessian}",
-                        input_expr=str(expr),
-                        result=str(hessian)
-                    ))
+                        operation="hessian",
+                        input_state={"expression": str(expr)},
+                        output_state={"expression": str(hessian)},
+                        reasoning=f"Hessian matrix computed: {hessian}"
+                    )
+                    self.steps.append(step)
                 except:
                     pass
             
@@ -272,12 +285,15 @@ class AdvancedCalculus:
             )
             
         except Exception as e:
-            self.steps.append(Step(
-                step_type="error",
+            step = Step(
+                step_id=str(len(self.steps)),
                 description=f"Error finding critical points: {str(e)}",
-                input_expr=expression,
-                result=""
-            ))
+                operation="error",
+                input_state={"expression": expression},
+                output_state={"expression": ""},
+                reasoning=f"Error finding critical points: {str(e)}"
+            )
+            self.steps.append(step)
             return OptimizationResult(
                 critical_points=[],
                 function_values=[],
@@ -303,10 +319,12 @@ class AdvancedCalculus:
                 initial_point = tuple(1.0 for _ in variables)
             
             self.steps.append(Step(
-                step_type="setup",
-                description=f"Starting gradient descent on {expression} from point {initial_point}",
-                input_expr=expression,
-                result=f"Initial point: {initial_point}"
+                step_id=str(len(self.steps)), 
+                description=f"Starting gradient descent on {expression} from point {initial_point}", 
+                operation="setup", 
+                input_state={"expression": expression}, 
+                output_state={"expression": f"Initial point: {initial_point}"}, 
+                reasoning=f"Starting gradient descent on {expression} from point {initial_point}"
             ))
             
             # Compute gradient functions
@@ -328,10 +346,12 @@ class AdvancedCalculus:
             current_point = np.array(initial_point)
             
             self.steps.append(Step(
-                step_type="iteration_start",
-                description=f"Iteration 0: f({initial_point}) = {function_values[0]:.6f}",
-                input_expr=str(initial_point),
-                result=str(function_values[0])
+                step_id=str(len(self.steps)), 
+                description=f"Iteration 0: f({initial_point}) = {function_values[0]:.6f}", 
+                operation="iteration_start", 
+                input_state={"expression": str(initial_point)}, 
+                output_state={"expression": str(function_values[0])}, 
+                reasoning=f"Iteration 0: f({initial_point}) = {function_values[0]:.6f}"
             ))
             
             for iteration in range(max_iterations):
@@ -343,10 +363,12 @@ class AdvancedCalculus:
                 grad_norm = np.linalg.norm(current_grad)
                 if grad_norm < tolerance:
                     self.steps.append(Step(
-                        step_type="convergence",
-                        description=f"Converged at iteration {iteration}: ||∇f|| = {grad_norm:.6f}",
-                        input_expr=str(current_point),
-                        result="Convergence achieved"
+                        step_id=str(len(self.steps)), 
+                        description=f"Converged at iteration {iteration}: ||∇f|| = {grad_norm:.6f}", 
+                        operation="convergence", 
+                        input_state={"expression": str(current_point)}, 
+                        output_state={"expression": "Convergence achieved"}, 
+                        reasoning=f"Converged at iteration {iteration}: ||∇f|| = {grad_norm:.6f}"
                     ))
                     break
                 
@@ -359,10 +381,12 @@ class AdvancedCalculus:
                 
                 if iteration % 10 == 0 or iteration < 5:
                     self.steps.append(Step(
-                        step_type="iteration",
-                        description=f"Iteration {iteration + 1}: f({current_point}) = {current_value:.6f}",
-                        input_expr=str(current_point),
-                        result=f"Value: {current_value:.6f}, Gradient norm: {grad_norm:.6f}"
+                        step_id=str(len(self.steps)), 
+                        description=f"Iteration {iteration + 1}: f({current_point}) = {current_value:.6f}", 
+                        operation="iteration", 
+                        input_state={"expression": str(current_point)}, 
+                        output_state={"expression": f"Value: {current_value:.6f}, Gradient norm: {grad_norm:.6f}"}, 
+                        reasoning=f"Iteration {iteration + 1}: f({current_point}) = {current_value:.6f}"
                     ))
             
             converged = grad_norm < tolerance if 'grad_norm' in locals() else False
@@ -379,10 +403,12 @@ class AdvancedCalculus:
             
         except Exception as e:
             self.steps.append(Step(
-                step_type="error",
-                description=f"Error in gradient descent: {str(e)}",
-                input_expr=expression,
-                result=""
+                step_id=str(len(self.steps)), 
+                description=f"Error in gradient descent: {str(e)}", 
+                operation="error", 
+                input_state={"expression": expression}, 
+                output_state={"expression": ""}, 
+                reasoning=f"Error in gradient descent: {str(e)}"
             ))
             return GradientDescentResult(
                 path=[],
@@ -477,10 +503,12 @@ class AdvancedCalculus:
             lambdas = [sp.Symbol(f'lambda_{i}') for i in range(len(constraints))]
             
             self.steps.append(Step(
-                step_type="setup",
-                description=f"Setting up Lagrangian for objective {objective} with constraints {constraints}",
-                input_expr=objective,
-                result=f"Variables: {variables}, Multipliers: {[str(l) for l in lambdas]}"
+                step_id=str(len(self.steps)), 
+                description=f"Setting up Lagrangian for objective {objective} with constraints {constraints}", 
+                operation="setup", 
+                input_state={"expression": objective}, 
+                output_state={"expression": f"Variables: {variables}, Multipliers: {[str(l) for l in lambdas]}"}, 
+                reasoning=f"Setting up Lagrangian for objective {objective} with constraints {constraints}"
             ))
             
             # Build Lagrangian
@@ -489,10 +517,12 @@ class AdvancedCalculus:
                 lagrangian += lambdas[i] * constraint
             
             self.steps.append(Step(
-                step_type="lagrangian",
-                description=f"Lagrangian: L = {lagrangian}",
-                input_expr=str(lagrangian),
-                result=str(lagrangian)
+                step_id=str(len(self.steps)), 
+                description=f"Lagrangian: L = {lagrangian}", 
+                operation="lagrangian", 
+                input_state={"expression": str(lagrangian)}, 
+                output_state={"expression": str(lagrangian)}, 
+                reasoning=f"Lagrangian: L = {lagrangian}"
             ))
             
             # Create system of equations
@@ -503,20 +533,24 @@ class AdvancedCalculus:
                 eq = sp.diff(lagrangian, var)
                 equations.append(eq)
                 self.steps.append(Step(
-                    step_type="gradient_condition",
-                    description=f"∂L/∂{var} = 0: {eq} = 0",
-                    input_expr=str(lagrangian),
-                    result=str(eq)
+                    step_id=str(len(self.steps)), 
+                    description=f"∂L/∂{var} = 0: {eq} = 0", 
+                    operation="gradient_condition", 
+                    input_state={"expression": str(lagrangian)}, 
+                    output_state={"expression": str(eq)}, 
+                    reasoning=f"∂L/∂{var} = 0: {eq} = 0"
                 ))
             
             # Constraint equations
             for constraint in constraint_exprs:
                 equations.append(constraint)
                 self.steps.append(Step(
-                    step_type="constraint",
-                    description=f"Constraint: {constraint} = 0",
-                    input_expr=str(constraint),
-                    result=str(constraint)
+                    step_id=str(len(self.steps)), 
+                    description=f"Constraint: {constraint} = 0", 
+                    operation="constraint", 
+                    input_state={"expression": str(constraint)}, 
+                    output_state={"expression": str(constraint)}, 
+                    reasoning=f"Constraint: {constraint} = 0"
                 ))
             
             # Solve system
@@ -542,10 +576,12 @@ class AdvancedCalculus:
                         })
                         
                         self.steps.append(Step(
-                            step_type="solution",
-                            description=f"Critical point: {point}, f = {objective_value:.4f}, λ = {multiplier_values}",
-                            input_expr=str(equations),
-                            result=f"Point: {point}, Value: {objective_value:.4f}"
+                            step_id=str(len(self.steps)), 
+                            description=f"Critical point: {point}, f = {objective_value:.4f}, λ = {multiplier_values}", 
+                            operation="solution", 
+                            input_state={"expression": str(equations)}, 
+                            output_state={"expression": f"Point: {point}, Value: {objective_value:.4f}"}, 
+                            reasoning=f"Critical point: {point}, f = {objective_value:.4f}, λ = {multiplier_values}"
                         ))
             
             return {
@@ -557,10 +593,12 @@ class AdvancedCalculus:
             
         except Exception as e:
             self.steps.append(Step(
-                step_type="error",
-                description=f"Error in Lagrange multipliers: {str(e)}",
-                input_expr=objective,
-                result=""
+                step_id=str(len(self.steps)), 
+                description=f"Error in Lagrange multipliers: {str(e)}", 
+                operation="error", 
+                input_state={"expression": objective}, 
+                output_state={"expression": ""}, 
+                reasoning=f"Error in Lagrange multipliers: {str(e)}"
             ))
             return {
                 "solutions": [],

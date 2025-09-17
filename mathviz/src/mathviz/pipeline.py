@@ -14,6 +14,12 @@ from .reasoning import ReasoningGenerator
 from .viz import Visualizer
 from .schemas import MathSolution
 try:
+    from .ai_parser import AIMathParser, ParseResult
+    AI_PARSER_AVAILABLE = True
+except ImportError:
+    AI_PARSER_AVAILABLE = False
+    print("AI parser not available - using regex parser")
+try:
     from .graph_visualizer import GraphConfig, VisualizationResult
     GRAPH_VISUALIZATION_AVAILABLE = True
 except ImportError:
@@ -26,6 +32,7 @@ class PipelineConfig:
     """Configuration for the MathViz pipeline"""
     use_ai: bool = True
     ai_first: bool = True
+    use_ai_parser: bool = True
     enable_interactive_graphs: bool = True
     enable_rate_limiting: bool = True
     max_retries: int = 3
@@ -44,7 +51,13 @@ class MathVizPipeline:
         self.last_request_time = 0.0
         
         # Initialize components with AI configuration
-        self.parser = MathParser()
+        if config.use_ai_parser and AI_PARSER_AVAILABLE:
+            self.parser = AIMathParser()
+            self.use_ai_parser = True
+        else:
+            self.parser = MathParser()
+            self.use_ai_parser = False
+        
         self.validator = MathValidator()
         self.solver = MathSolver(
             use_ai=config.use_ai, 
@@ -58,7 +71,7 @@ class MathVizPipeline:
             enable_interactive_graphs=config.enable_interactive_graphs
         )
         
-        logger.info(f"MathVizPipeline initialized - AI: {config.use_ai}, Interactive Graphs: {config.enable_interactive_graphs}")
+        logger.info(f"MathVizPipeline initialized - AI: {config.use_ai}, AI Parser: {self.use_ai_parser}, Interactive Graphs: {config.enable_interactive_graphs}")
 
     def process(self, problem_text: str) -> MathSolution:
         """Process a math problem through the complete AI-enhanced pipeline."""
@@ -180,7 +193,18 @@ class MathVizPipeline:
         for attempt in range(self.config.max_retries):
             try:
                 logger.debug(f"Parsing attempt {attempt + 1}/{self.config.max_retries}")
-                return self.parser.parse(problem_text)
+                
+                if self.use_ai_parser:
+                    # Use AI parser
+                    parse_result = self.parser.parse(problem_text)
+                    if not parse_result.success:
+                        raise ValueError(f"AI parsing failed: {parse_result.error}")
+                    logger.info(f"AI parsing successful (confidence: {parse_result.confidence:.2f})")
+                    return parse_result.problem
+                else:
+                    # Use regex parser
+                    return self.parser.parse(problem_text)
+                    
             except Exception as e:
                 last_exception = e
                 logger.warning(f"Parsing attempt {attempt + 1} failed: {e}")

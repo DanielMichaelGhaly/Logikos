@@ -12,6 +12,7 @@ from .schemas import MathProblem, MathSolution, Equation
 from .trace import StepTrace, Step
 from .reasoning import ReasoningGenerator
 from .viz import Visualizer
+from .step_explainer import MasterStepExplainer
 try:
     from .ai_apis import solve_with_ai, AIResponse
     AI_AVAILABLE = True
@@ -34,6 +35,7 @@ class MathSolver:
     def __init__(self, use_ai: bool = True, ai_first: bool = True):
         self.reasoner = ReasoningGenerator()
         self.visualizer = Visualizer()
+        self.step_explainer = MasterStepExplainer()
         self.step_counter = 0
         self.use_ai = use_ai and AI_AVAILABLE
         self.ai_first = ai_first  # Try AI first, then fallback to symbolic
@@ -266,62 +268,78 @@ class MathSolver:
             raise ValueError("Unrecognized calculus problem type")
     
     def _solve_derivative(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
-        """Solve derivative problems."""
-        # For now, handle simple cases - this could be expanded significantly
+        """Solve derivative problems with detailed step-by-step explanations."""
         import re
         
         # Try to extract expression from problem text
-        # Look for patterns like "derivative of x^2 + 3x" or "d/dx(x^2)"
         text = problem.problem_text
-        
-        # Simple pattern: "derivative of [expression]"
-        match = re.search(r"derivative of ([^,\.]+)", text, re.IGNORECASE)
+
+        # Normalize common formats like "f(x) = sin(x)"
+        norm = re.sub(r"^\s*f\s*\(\s*x\s*\)\s*=\s*", "", text, flags=re.IGNORECASE)
+        norm = re.sub(r"^\s*y\s*=\s*", "", norm, flags=re.IGNORECASE)
+
+        # Simple patterns for extraction
+        match = re.search(r"derivative of ([^,\.]+)", norm, re.IGNORECASE)
         if not match:
-            match = re.search(r"differentiate ([^,\.]+)", text, re.IGNORECASE)
+            match = re.search(r"differentiate ([^,\.]+)", norm, re.IGNORECASE)
+        if not match and "=" in norm:
+            # If an equals sign remains, prefer RHS
+            match = re.search(r"=\s*([^,\.]+)", norm)
         
         if not match:
-            raise ValueError("Could not extract expression for differentiation")
+            # As a fallback, try to extract a trig-like token e.g., sin(x)
+            m2 = re.search(r"([a-zA-Z]+\s*\([^)]*\))", norm)
+            if not m2:
+                raise ValueError("Could not extract expression for differentiation")
+            expr_str = m2.group(1).replace(" ", "").strip()
+        else:
+            expr_str = match.group(1).strip()
         
-        expr_str = match.group(1).strip()
+        # Use step explainer for detailed mathematical steps
+        math_steps = self.step_explainer.explain_derivative(expr_str, 'x')
         
-        # Create symbol (assume x unless specified)
-        x = sp.Symbol('x')
+        # Convert MathStep objects to Step objects for the trace
+        for math_step in math_steps:
+            step = Step(
+                step_id=f"derivative_step_{math_step.step_number}",
+                description=math_step.explanation,
+                operation=math_step.rule_name.lower().replace(" ", "_"),
+                input_state={
+                    "expression": math_step.before_expression,
+                    "rule": math_step.rule_name,
+                    "latex": math_step.latex_before
+                },
+                output_state={
+                    "expression": math_step.after_expression,
+                    "latex": math_step.latex_after
+                },
+                reasoning=math_step.explanation,
+                rule_formula=math_step.rule_formula
+            )
+            trace.add_step(step)
         
-        self._add_step(trace, "parse_expression",
-                     f"Original: {text}",
-                     f"Expression to differentiate: {expr_str}",
-                     "Extracted expression for differentiation")
-        
-        # Convert to SymPy expression with preprocessing
-        try:
-            processed_expr = self._preprocess_expression(expr_str)
-            expr = sp.sympify(processed_expr, locals={'x': x})
-        except:
-            raise ValueError(f"Could not parse expression: {expr_str}")
-        
-        # Compute derivative
-        derivative = sp.diff(expr, x)
-        simplified = sp.simplify(derivative)
-        
-        self._add_step(trace, "differentiate",
-                     f"f(x) = {expr}",
-                     f"f'(x) = {derivative}",
-                     "Applied differentiation rules")
-        
-        if simplified != derivative:
-            self._add_step(trace, "simplify",
-                         f"f'(x) = {derivative}",
-                         f"f'(x) = {simplified}",
-                         "Simplified the result")
-        
-        trace.final_state = f"Derivative: {simplified}"
-        
-        return {
-            "type": "derivative",
-            "original_expression": str(expr),
-            "derivative": str(simplified),
-            "variable": "x"
-        }
+        # Extract final result from the last step
+        if math_steps:
+            final_step = math_steps[-1]
+            final_result = final_step.after_expression
+            
+            # Extract just the derivative part (remove "f'(x) = ")
+            if "f'(x) = " in final_result:
+                derivative_result = final_result.replace("f'(x) = ", "")
+            else:
+                derivative_result = final_result
+            
+            trace.final_state = f"Derivative: {derivative_result}"
+            
+            return {
+                "type": "derivative",
+                "original_expression": expr_str,
+                "derivative": derivative_result,
+                "variable": "x",
+                "step_count": len(math_steps)
+            }
+        else:
+            raise ValueError("Failed to generate derivative steps")
     
     def _solve_integral(self, problem: MathProblem, trace: StepTrace, ai_solution: Optional[Any] = None) -> Dict[str, Any]:
         """Solve integration problems."""
@@ -427,11 +445,12 @@ class MathSolver:
     def _add_step(self, trace: StepTrace, operation: str, before: str, after: str, justification: str) -> None:
         """Add a step to the solution trace."""
         step = Step(
-            step_id=self.step_counter,
+            step_id=str(self.step_counter),
+            description=justification,
             operation=operation,
-            expression_before=before,
-            expression_after=after,
-            justification=justification
+            input_state={"expression": before},
+            output_state={"expression": after},
+            reasoning=justification
         )
         trace.add_step(step)
         self.step_counter += 1

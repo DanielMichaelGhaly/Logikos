@@ -10,6 +10,8 @@ from typing import Dict, List, Any, Optional
 import traceback
 import uvicorn
 from datetime import datetime
+from .ai.base import provider_from_env
+from .ai.graphing import maybe_make_desmos_config
 
 # Import MathViz components
 from .pipeline import MathVizPipeline
@@ -37,6 +39,7 @@ app.add_middleware(
 
 # Initialize MathViz pipeline
 pipeline = MathVizPipeline()
+ai_provider = provider_from_env()
 
 # Request/Response Models
 class ProblemRequest(BaseModel):
@@ -282,6 +285,91 @@ async def solve_problem(request: ProblemRequest):
             message=f"Error solving problem: {str(e)}",
             execution_time_ms=execution_time,
             error_details=error_details
+        )
+
+class ChatRequest(BaseModel):
+    """Chat-style request model that expects a math question."""
+    message: str = Field(..., description="User message containing a math question", min_length=1)
+    include_steps: bool = Field(True, description="Include step-by-step solution")
+    include_reasoning: bool = Field(True, description="Include detailed reasoning")
+    include_visualization: bool = Field(True, description="Include visualization data")
+
+class DesmosConfigModel(BaseModel):
+    expressions: List[str]
+    xmin: Optional[float] = None
+    xmax: Optional[float] = None
+    ymin: Optional[float] = None
+    ymax: Optional[float] = None
+
+class ChatResponse(APIResponse):
+    reply_text: str
+    solution: Optional[Dict[str, Any]] = None
+    desmos_url: Optional[str] = None
+    desmos_config: Optional[DesmosConfigModel] = None
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """AI-first chat endpoint: message -> AI structuring -> solve -> AI steps -> optional graph."""
+    start_time = datetime.now()
+
+    try:
+        # 1) Use AI provider to structure the problem from free-form chat
+        ai_result = ai_provider.generate_structured_problem(request.message)
+        normalized_text = ai_result.structured_problem.problem_text
+
+        # 2) Solve using existing pipeline
+        solved = pipeline.process(normalized_text)
+
+        # 3) Build a solution payload that's frontend-friendly
+        solution_payload: Dict[str, Any] = {
+            "problem": {
+                "text": getattr(solved.problem, "problem_text", normalized_text),
+                "type": getattr(solved.problem, "problem_type", None),
+                "goal": getattr(solved.problem, "goal", None),
+            },
+            "final_answer": getattr(solved, "final_answer", None),
+            "metadata": getattr(solved, "metadata", {}) or {},
+        }
+
+        # Optional components
+        if request.include_steps and getattr(solved, "solution_steps", None):
+            solution_payload["steps"] = solved.solution_steps
+        if request.include_reasoning and getattr(solved, "reasoning", None):
+            # Optionally enhance with AI provider
+            ai_steps = ai_provider.explain_steps({
+                "reasoning": solved.reasoning
+            })
+            solution_payload["reasoning"] = ai_steps.reasoning or solved.reasoning
+        if request.include_visualization and getattr(solved, "visualization", None):
+            solution_payload["visualization"] = solved.visualization
+
+        # 4) Heuristically provide Desmos config if appropriate
+        desmos_config_model: Optional[DesmosConfigModel] = None
+        desmos_config = maybe_make_desmos_config(solution_payload)
+        if desmos_config:
+            desmos_config_model = DesmosConfigModel(
+                expressions=desmos_config.expressions,
+                xmin=desmos_config.xmin,
+                xmax=desmos_config.xmax,
+                ymin=desmos_config.ymin,
+                ymax=desmos_config.ymax,
+            )
+
+        _ = (datetime.now() - start_time).total_seconds() * 1000  # execution time (unused in response)
+
+        return ChatResponse(
+            success=True,
+            message="Chat processed successfully",
+            reply_text=ai_result.reply_text,
+            solution=solution_payload,
+            desmos_config=desmos_config_model,
+        )
+
+    except Exception as e:
+        return ChatResponse(
+            success=False,
+            message=f"Error processing chat: {str(e)}",
+            reply_text="Sorry, I ran into an error processing that question.",
         )
 
 @app.get("/examples")

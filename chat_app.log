@@ -1,0 +1,22 @@
+🚀 Starting MathViz Simple Chat Interface...
+💬 Chat-style math solving with basic Desmos links
+📱 Open your browser to: http://localhost:8501
+🛑 Press Ctrl+C to stop
+==================================================
+✅ This version works with minimal dependencies
+✅ Chat-style interface with solutions
+✅ Basic Desmos graph links
+✅ Step-by-step explanations
+==================================================
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8502
+  Network URL: http://172.16.26.225:8502
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+  Stopping...

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 import base64
 import urllib.parse
 import numpy as np
+import re
 import sympy as sp
 import plotly.graph_objects as go
 import plotly.express as px
@@ -115,7 +116,10 @@ class DesmosAPI:
         """Convert expression to Desmos LaTeX format"""
         try:
             # Parse with SymPy
-            expr = sp.sympify(expression)
+            # Normalize common 'f(x) =' or 'y =' prefixes
+            cleaned = re.sub(r"^\s*f\s*\(\s*x\s*\)\s*=\s*", "", expression)
+            cleaned = re.sub(r"^\s*y\s*=\s*", "", cleaned)
+            expr = sp.sympify(cleaned)
             
             # Convert to LaTeX
             latex = sp.latex(expr)
@@ -181,7 +185,9 @@ class GeoGebraAPI:
     def _convert_to_geogebra_format(self, expression: str) -> str:
         """Convert expression to GeoGebra format"""
         try:
-            expr = sp.sympify(expression)
+            cleaned = re.sub(r"^\s*f\s*\(\s*x\s*\)\s*=\s*", "", expression)
+            cleaned = re.sub(r"^\s*y\s*=\s*", "", cleaned)
+            expr = sp.sympify(cleaned)
             # GeoGebra uses standard mathematical notation
             return str(expr).replace("**", "^")
         except:
