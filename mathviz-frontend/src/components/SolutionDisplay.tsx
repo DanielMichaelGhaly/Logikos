@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import { motion, AnimatePresence } from 'framer-motion';
-import 'katex/dist/katex.min.css';
-import { InlineMath, BlockMath } from 'react-katex';
-import { MathSolution, MathStep, LegacyStep } from '../types/mathviz';
+import React, { useState } from "react";
+import styled from "styled-components";
+import { motion, AnimatePresence } from "framer-motion";
+import "katex/dist/katex.min.css";
+import { InlineMath, BlockMath } from "react-katex";
+import { MathSolution, MathStep, LegacyStep } from "../types/mathviz";
 
 const SolutionContainer = styled(motion.div)`
   background: #f9fafb;
@@ -25,8 +25,8 @@ const FinalAnswer = styled(motion.div)`
   box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
   display: flex;
   align-items: center;
-  
-    &::before {
+
+  &::before {
     content: "";
   }
 `;
@@ -40,7 +40,7 @@ const StepsHeader = styled.div`
   padding: 0.5rem;
   border-radius: 8px;
   transition: background-color 0.2s ease;
-  
+
   &:hover {
     background: rgba(0, 0, 0, 0.02);
   }
@@ -49,7 +49,7 @@ const StepsHeader = styled.div`
 const StepsTitle = styled.h3`
   font-weight: 700;
   font-size: 1rem;
-  color: #E5E7EB;
+  color: #e5e7eb;
   margin: 0;
   display: flex;
   align-items: center;
@@ -65,9 +65,9 @@ const ExpandButton = styled(motion.button)<{ isExpanded: boolean }>`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  
+
   &::after {
-    content: "${props => props.isExpanded ? '▲' : '▼'}";
+    content: "${(props) => (props.isExpanded ? "▲" : "▼")}";
     transition: transform 0.2s ease;
   }
 `;
@@ -84,12 +84,12 @@ const StepCard = styled(motion.div)`
   margin-bottom: 0.75rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.2s ease;
-  
+
   &:hover {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     transform: translateY(-1px);
   }
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -102,7 +102,7 @@ const StepTitle = styled.div`
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
-  
+
   &::before {
     content: counter(step-counter);
     counter-increment: step-counter;
@@ -127,7 +127,7 @@ const RuleFormula = styled.div`
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   font-size: 0.85rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   margin: 0.5rem 0;
   border-left: 3px solid #3b82f6;
 `;
@@ -136,7 +136,7 @@ const MathTransformation = styled.div`
   background: #f3f4f6;
   padding: 0.75rem;
   border-radius: 10px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 0.9rem;
   margin: 0.5rem 0;
   display: flex;
@@ -181,65 +181,114 @@ interface SolutionDisplayProps {
 }
 
 const isLegacyStep = (step: MathStep | LegacyStep): step is LegacyStep => {
-  return 'step_id' in step && 'description' in step;
+  return "step_id" in step && "description" in step;
 };
 
 const formatMathExpression = (expr: string): string => {
-  if (!expr) return '';
-  
+  if (!expr) return "";
+
   // Convert common math notation to LaTeX
   return expr
-    .replace(/\^(\d+)/g, '^{$1}')
-    .replace(/\^([a-zA-Z]+)/g, '^{$1}')
-    .replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}')
-    .replace(/\bpi\b/g, '\\pi')
-    .replace(/\binfinity\b/g, '\\infty')
-    .replace(/\*/g, '\\cdot')
-    .replace(/\+-/g, '\\pm');
+    .replace(/\^(\d+)/g, "^{$1}")
+    .replace(/\^([a-zA-Z]+)/g, "^{$1}")
+    .replace(/sqrt\(([^)]+)\)/g, "\\sqrt{$1}")
+    .replace(/\bpi\b/g, "\\pi")
+    .replace(/\binfinity\b/g, "\\infty")
+    .replace(/\*/g, "\\cdot")
+    .replace(/\+-/g, "\\pm");
 };
 
-const SafeMath: React.FC<{ children: string; block?: boolean }> = ({ children, block = false }) => {
+const SafeMath: React.FC<{ children: string; block?: boolean }> = ({
+  children,
+  block = false,
+}) => {
   try {
     const formatted = formatMathExpression(children);
-    return block ? <BlockMath>{formatted}</BlockMath> : <InlineMath>{formatted}</InlineMath>;
+    return block ? (
+      <BlockMath>{formatted}</BlockMath>
+    ) : (
+      <InlineMath>{formatted}</InlineMath>
+    );
   } catch (error) {
     // Fallback to plain text if LaTeX parsing fails
-    return <code style={{ fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>;
+    return (
+      <code style={{ fontFamily: "JetBrains Mono, monospace" }}>
+        {children}
+      </code>
+    );
   }
 };
 
-export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) => {
+export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({
+  solution,
+}) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   const formatFinalAnswer = (answer: any): string => {
-    if (typeof answer === 'object' && answer !== null) {
+    if (typeof answer === "object" && answer !== null) {
       if (answer.solutions) {
         return `x = ${JSON.stringify(answer.solutions)}`;
       } else if (answer.derivative) {
         return `f'(x) = ${answer.derivative}`;
       } else if (answer.integral) {
         return `∫f(x)dx = ${answer.integral} + C`;
-      } else if (answer.type === 'derivative') {
-        return `f'(x) = ${answer.derivative || 'N/A'}`;
-      } else if (answer.type === 'algebraic_solution' && answer.solutions) {
+      } else if (answer.type === "derivative") {
+        return `f'(x) = ${answer.derivative || "N/A"}`;
+      } else if (answer.type === "algebraic_solution" && answer.solutions) {
         const solutions = answer.solutions;
-        return Object.entries(solutions).map(([k, v]) => `${k} = ${v}`).join(', ');
+        return Object.entries(solutions)
+          .map(([k, v]) => `${k} = ${v}`)
+          .join(", ");
       }
       return JSON.stringify(answer);
     }
     return String(answer);
   };
 
+  // Render HTML visualization if present (e.g., contour map, plotly, gnuplot)
+  const renderVisualization = () => {
+    if (
+      solution.visualization &&
+      typeof solution.visualization === "string" &&
+      solution.visualization.includes("<")
+    ) {
+      return (
+        <div style={{ margin: "2rem 0", textAlign: "center" }}>
+          <div dangerouslySetInnerHTML={{ __html: solution.visualization }} />
+        </div>
+      );
+    }
+    // Optionally support graph_html in metadata (type safe)
+    const meta = solution.metadata as any;
+    if (
+      meta &&
+      meta.interactive_visualization &&
+      meta.interactive_visualization.has_html
+    ) {
+      const html = meta.interactive_visualization.graph_html;
+      if (html) {
+        return (
+          <div style={{ margin: "2rem 0", textAlign: "center" }}>
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        );
+      }
+    }
+    return null;
+  };
+
   const renderStep = (step: MathStep | LegacyStep, index: number) => {
     if (isLegacyStep(step)) {
       // Handle new detailed format
-      const operation = step.operation.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const operation = step.operation
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase());
       const description = step.reasoning || step.description;
       const ruleFormula = step.rule_formula;
-      
-      const beforeExpr = step.input_state?.expression || '';
-      const afterExpr = step.output_state?.expression || '';
-      
+
+      const beforeExpr = step.input_state?.expression || "";
+      const afterExpr = step.output_state?.expression || "";
+
       return (
         <StepCard
           key={step.step_id}
@@ -248,13 +297,13 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
           transition={{ delay: index * 0.1 }}
         >
           <StepTitle>{operation}</StepTitle>
-          
+
           {ruleFormula && (
             <RuleFormula>
               <SafeMath>{ruleFormula}</SafeMath>
             </RuleFormula>
           )}
-          
+
           {beforeExpr && afterExpr && beforeExpr !== afterExpr && (
             <MathTransformation>
               <MathExpression>
@@ -266,7 +315,7 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
               </MathExpression>
             </MathTransformation>
           )}
-          
+
           <StepExplanation>{description}</StepExplanation>
         </StepCard>
       );
@@ -280,13 +329,13 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
           transition={{ delay: index * 0.1 }}
         >
           <StepTitle>{step.rule_name}</StepTitle>
-          
+
           {step.rule_formula && (
             <RuleFormula>
               <SafeMath>{step.rule_formula}</SafeMath>
             </RuleFormula>
           )}
-          
+
           {step.before_expression && step.after_expression && (
             <MathTransformation>
               <MathExpression>
@@ -306,7 +355,7 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
               </MathExpression>
             </MathTransformation>
           )}
-          
+
           <StepExplanation>{step.explanation}</StepExplanation>
         </StepCard>
       );
@@ -317,10 +366,10 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
     <SolutionContainer
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ 
+      transition={{
         type: "spring",
         stiffness: 300,
-        damping: 30
+        damping: 30,
       }}
     >
       {/* Final Answer */}
@@ -334,52 +383,66 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({ solution }) =>
         </FinalAnswer>
       )}
 
-      {/* Solution Steps */}
-      {(solution.solution_steps || (solution as any).steps) && (solution.solution_steps || (solution as any).steps).length > 0 && (
-        <div>
-          <StepsHeader onClick={() => setIsExpanded(!isExpanded)}>
-            <StepsTitle>
-              Step-by-Step Solution ({(solution.solution_steps || (solution as any).steps).length} steps)
-            </StepsTitle>
-            <ExpandButton
-              isExpanded={isExpanded}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {isExpanded ? 'Hide steps' : 'Show steps'}
-            </ExpandButton>
-          </StepsHeader>
+      {/* Visualization (contour map, plot, etc.) */}
+      {renderVisualization()}
 
-          <AnimatePresence>
-            {isExpanded && (
-              <StepsContainer
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
+      {/* Solution Steps */}
+      {(solution.solution_steps || (solution as any).steps) &&
+        (solution.solution_steps || (solution as any).steps).length > 0 && (
+          <div>
+            <StepsHeader onClick={() => setIsExpanded(!isExpanded)}>
+              <StepsTitle>
+                Step-by-Step Solution (
+                {(solution.solution_steps || (solution as any).steps).length}{" "}
+                steps)
+              </StepsTitle>
+              <ExpandButton
+                isExpanded={isExpanded}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                <StepCounter>
-                  {(solution.solution_steps || (solution as any).steps).slice(0, 10).map((step: any, index: number) => 
-                    renderStep(step, index)
-                  )}
-                  
-                  {(solution.solution_steps || (solution as any).steps).length > 10 && (
-                    <div style={{ 
-                      textAlign: 'center', 
-                      color: '#6b7280', 
-                      fontSize: '0.85rem', 
-                      marginTop: '1rem',
-                      fontStyle: 'italic'
-                    }}>
-                      + {(solution.solution_steps || (solution as any).steps).length - 10} more steps available
-                    </div>
-                  )}
-                </StepCounter>
-              </StepsContainer>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+                {isExpanded ? "Hide steps" : "Show steps"}
+              </ExpandButton>
+            </StepsHeader>
+
+            <AnimatePresence>
+              {isExpanded && (
+                <StepsContainer
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <StepCounter>
+                    {(solution.solution_steps || (solution as any).steps)
+                      .slice(0, 10)
+                      .map((step: any, index: number) =>
+                        renderStep(step, index)
+                      )}
+
+                    {(solution.solution_steps || (solution as any).steps)
+                      .length > 10 && (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          color: "#6b7280",
+                          fontSize: "0.85rem",
+                          marginTop: "1rem",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        +{" "}
+                        {(solution.solution_steps || (solution as any).steps)
+                          .length - 10}{" "}
+                        more steps available
+                      </div>
+                    )}
+                  </StepCounter>
+                </StepsContainer>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
     </SolutionContainer>
   );
 };

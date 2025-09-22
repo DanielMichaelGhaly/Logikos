@@ -27,6 +27,27 @@ logger = logging.getLogger(__name__)
 
 
 class Visualizer:
+    def generate_contour_map(self, expression: str, config: Optional[GraphConfig] = None) -> Optional[VisualizationResult]:
+        """Generate a contour map for a function of two variables using Plotly (free)."""
+        if not self.enable_interactive_graphs or not self.graph_visualizer:
+            logger.warning("Interactive graph visualization not available for contour map")
+            return None
+        try:
+            return self.graph_visualizer.visualize_contour(expression, config)
+        except Exception as e:
+            logger.error(f"Error generating contour map: {e}")
+            return None
+
+    def generate_contour_map(self, expression: str, variables: list = None, config: Optional[GraphConfig] = None, levels: int = 10) -> Optional[VisualizationResult]:
+        """Generate a contour map visualization for a function of two variables."""
+        if not self.enable_interactive_graphs or not self.graph_visualizer:
+            logger.warning("Interactive graph visualization not available for contour map")
+            return None
+        try:
+            return self.graph_visualizer.visualize_contour(expression, variables, config, levels)
+        except Exception as e:
+            logger.error(f"Error generating contour map: {e}")
+            return None
     """Comprehensive visualization generator for mathematical solutions with interactive graph capabilities."""
 
     def __init__(self, enable_interactive_graphs: bool = True):
@@ -242,7 +263,7 @@ class Visualizer:
         return None
     
     def _is_multivariable_function(self, expression: str) -> bool:
-        """Check if expression contains multiple variables for 3D plotting."""
+        """Check if expression contains multiple variables for 3D or contour plotting."""
         try:
             expr = sp.sympify(expression)
             variables = expr.free_symbols
@@ -275,8 +296,15 @@ class Visualizer:
         return self.graph_visualizer.visualize_functions(expressions, config)
     
     def _generate_3d_function_graph(self, expression: str, config: GraphConfig) -> Optional[VisualizationResult]:
-        """Generate 3D graph for multivariable functions."""
-        return self.graph_visualizer.visualize_3d_function(expression, config=config)
+        """Generate 3D or contour graph for multivariable functions."""
+        # Try contour map first, fallback to 3D if needed
+        contour_result = self.generate_contour_map(expression, config)
+        if contour_result and contour_result.success:
+            return contour_result
+        # Fallback to 3D surface if available
+        if hasattr(self.graph_visualizer, 'visualize_3d_function'):
+            return self.graph_visualizer.visualize_3d_function(expression, config=config)
+        return None
 
     def generate_plotly_figure(self, trace: StepTrace, solution: Optional[MathSolution] = None) -> Optional[go.Figure]:
         """Generate interactive Plotly visualization."""

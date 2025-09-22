@@ -68,55 +68,46 @@ class MathParser:
         return variables
 
     def _extract_equations(self, text: str) -> List[Equation]:
-        """Extract equations from the problem text."""
+        """Extract equations from the problem text, robustly handling instruction phrases and extracting only the math part."""
         equations = []
-        
-        # Special handling for "solve for" pattern
-        solve_pattern = r"solve\s+for\s+\w+:\s*(.+?)\s*=\s*(.+)$"
-        solve_match = re.search(solve_pattern, text, re.IGNORECASE)
-        
-        if solve_match:
-            left_side, right_side = solve_match.groups()
-            equations.append(Equation(
-                left_side=left_side.strip(),
-                right_side=right_side.strip()
-            ))
-        else:
-            # Handle "find the roots of <expr>" or similar phrasing
-            roots_patterns = [
-                r"find\s+the\s+roots\s+of\s+(.+)$",
-                r"find\s+roots\s+of\s+(.+)$",
-                r"roots\s+of\s+(.+)$",
-                r"find\s+the\s+zeros\s+of\s+(.+)$",
-                r"find\s+zeros\s+of\s+(.+)$",
-                r"zeros\s+of\s+(.+)$",
-            ]
-            matched_expr = None
-            for pattern in roots_patterns:
-                m = re.search(pattern, text, re.IGNORECASE)
-                if m:
-                    matched_expr = m.group(1).strip()
-                    break
-            if matched_expr:
-                # Convert to an equation "expr = 0"
+
+        # Remove all known instruction phrases
+        cleaned_text = text
+        instruction_patterns = [
+            r"solve\s+for\s+\w+:\s*",
+            r"find\s+the\s+roots\s+of\s+",
+            r"find\s+roots\s+of\s+",
+            r"roots\s+of\s+",
+            r"find\s+the\s+zeros\s+of\s+",
+            r"find\s+zeros\s+of\s+",
+            r"zeros\s+of\s+",
+        ]
+        for pat in instruction_patterns:
+            cleaned_text = re.sub(pat, "", cleaned_text, flags=re.IGNORECASE)
+
+        # If the original text was a 'roots' or 'zeros' instruction, treat as equation = 0
+        if any(re.match(pat, text, re.IGNORECASE) for pat in instruction_patterns[1:]):
+            expr = cleaned_text.strip()
+            if expr:
                 equations.append(Equation(
-                    left_side=matched_expr,
+                    left_side=expr,
                     right_side="0"
                 ))
-            else:
-                # Try other patterns
-                for pattern in self.equation_patterns:
-                    if pattern.startswith("solve"):  # Skip the solve pattern as we handled it above
-                        continue
-                    matches = re.findall(pattern, text)
-                    for match in matches:
-                        if len(match) == 2:
-                            left_side, right_side = match
-                            equations.append(Equation(
-                                left_side=left_side.strip(),
-                                right_side=right_side.strip()
-                            ))
-        
+        else:
+            # Extract the first valid equation (left = right) from the cleaned text
+            # This regex matches anything (non-greedy) before and after the first '='
+            eq_match = re.search(r"(.+?)\s*=\s*(.+)", cleaned_text)
+            if eq_match:
+                left_side = eq_match.group(1).strip()
+                right_side = eq_match.group(2).strip()
+                # Ensure left_side does not contain instruction text
+                for pat in instruction_patterns:
+                    left_side = re.sub(pat, "", left_side, flags=re.IGNORECASE).strip()
+                equations.append(Equation(
+                    left_side=left_side,
+                    right_side=right_side
+                ))
+
         return equations
 
     def _extract_goal(self, text: str) -> str:
