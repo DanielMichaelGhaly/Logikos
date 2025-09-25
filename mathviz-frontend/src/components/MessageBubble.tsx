@@ -1,6 +1,8 @@
 import React from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
+import { InlineMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
 import { ChatMessage } from '../types/mathviz';
 
 const MessageContainer = styled.div<{ isUser: boolean }>`
@@ -80,12 +82,97 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.type === 'user';
   const avatar = message.has_solution ? "MV" : "AI";
 
-  const formatContent = (content: string) => {
-    // Simple markdown-style formatting
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br>');
+  const formatContent = (content: string): string | null => {
+    // Parse LaTeX expressions and markdown
+    let remaining = content;
+
+    // First handle LaTeX expressions (looking for patterns like 2x^2, f'(x), etc.)
+    const mathPatterns = [
+      /\b\d*[a-zA-Z]\^?\{?[0-9a-zA-Z]*\}?/g, // Variables with exponents like x^2, x^{2}
+      /\b[a-zA-Z]'?\([a-zA-Z]\)/g, // Functions like f(x), f'(x)
+      /\b\d+[a-zA-Z]\s*[+\-]\s*\d+/g, // Terms like 2x + 3
+      /\b[a-zA-Z]\s*=\s*[0-9\-+*/^()a-zA-Z\s]+/g, // Equations like x = 2
+      /∫.*?dx/g, // Integrals
+      /∑.*?/g, // Summations
+      /√\(.*?\)/g, // Square roots
+    ];
+
+    let hasMatches = false;
+
+    for (const pattern of mathPatterns) {
+      const matches = Array.from(remaining.matchAll(pattern));
+      if (matches.length > 0) {
+        hasMatches = true;
+        break;
+      }
+    }
+
+    if (!hasMatches) {
+      // No math expressions found, just handle markdown
+      return remaining
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    }
+
+    // If we have math, we need to render as JSX components
+    return null; // Signal to use JSX rendering
+  };
+
+  const renderContentWithMath = (content: string) => {
+    const parts: React.ReactNode[] = [];
+    let remaining = content;
+    let index = 0;
+
+    // Simple math detection patterns
+    const mathRegex = /(\b\d*[a-zA-Z]\^?\{?[0-9a-zA-Z]*\}?|\b[a-zA-Z]'?\([a-zA-Z]\)|\b\d+[a-zA-Z]\s*[+\-]\s*\d+|\b[a-zA-Z]\s*=\s*[0-9\-+*/^()a-zA-Z\s]+|∫.*?dx|∑.*?|√\(.*?\))/g;
+
+    let match;
+    let lastEnd = 0;
+
+    while ((match = mathRegex.exec(remaining)) !== null) {
+      // Add text before the match
+      if (match.index > lastEnd) {
+        const textBefore = remaining.slice(lastEnd, match.index);
+        if (textBefore.trim()) {
+          parts.push(
+            <span key={index++} dangerouslySetInnerHTML={{
+              __html: textBefore
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>')
+            }} />
+          );
+        }
+      }
+
+      // Add the math expression
+      try {
+        parts.push(<InlineMath key={index++}>{match[1]}</InlineMath>);
+      } catch (error) {
+        // Fallback to plain text if LaTeX fails
+        parts.push(<code key={index++}>{match[1]}</code>);
+      }
+
+      lastEnd = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastEnd < remaining.length) {
+      const textAfter = remaining.slice(lastEnd);
+      if (textAfter.trim()) {
+        parts.push(
+          <span key={index++} dangerouslySetInnerHTML={{
+            __html: textAfter
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/`(.*?)`/g, '<code>$1</code>')
+              .replace(/\n/g, '<br>')
+          }} />
+        );
+      }
+    }
+
+    return parts.length > 0 ? parts : [content];
   };
 
   const formatTime = (timestamp: Date) => {
@@ -109,11 +196,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           damping: 30
         }}
       >
-        <MessageText 
-          dangerouslySetInnerHTML={{ 
-            __html: formatContent(message.content) 
-          }} 
-        />
+        <MessageText>
+          {(() => {
+            const formattedContent = formatContent(message.content);
+            return formattedContent === null
+              ? renderContentWithMath(message.content)
+              : <span dangerouslySetInnerHTML={{ __html: formattedContent }} />;
+          })()}
+        </MessageText>
         <Timestamp isUser={isUser}>
           {formatTime(message.timestamp)}
         </Timestamp>

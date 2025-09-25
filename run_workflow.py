@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 # Import our custom modules
-from ai.qwen_solver import QwenSolver, AIResponse
+from ai.ai_solver import AISolver, AIResponse
 from ai.response_parser import ResponseParser
 from sympy_backend.expression_parser import EnhancedMathParser
 from sympy_backend.solver import SymPySolver 
@@ -52,7 +52,7 @@ class MathWorkflow:
         
         # Initialize AI components if enabled
         if self.enable_ai:
-            self.ai_solver = QwenSolver()
+            self.ai_solver = AISolver()
             self.response_parser = ResponseParser()
         else:
             self.ai_solver = None

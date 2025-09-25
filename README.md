@@ -6,7 +6,7 @@
 
 Logikos combines AI-powered mathematical explanations with SymPy's symbolic computation for accurate and educational problem solving. The system provides:
 
-- **🤖 AI Explanations**: Step-by-step solutions using Qwen 2.5 32B model
+- **🤖 AI Explanations**: Step-by-step solutions using Nemotron model
 - **🔢 SymPy Verification**: Mathematical accuracy guaranteed by symbolic computation
 - **✅ Cross-Validation**: AI solutions are automatically verified against SymPy results
 - **📊 Rich Visualization**: LaTeX formatting and interactive displays
@@ -30,9 +30,16 @@ Logikos combines AI-powered mathematical explanations with SymPy's symbolic comp
    pip install -r requirements.txt
    ```
 
-3. **Test the system**:
+3. **Start the application**:
    ```bash
+   # Command-line interface
+   ./start.sh
+
+   # Or test directly
    python run_workflow.py "solve 2x+5=0" --no-ai
+
+   # Full web application (if available)
+   ./start.sh --full-app
    ```
 
 ## Usage Examples
@@ -76,7 +83,7 @@ Logikos/
 ├── requirements.txt         # Dependencies
 ├── README.md               # This file
 ├── ai/                     # AI processing components
-│   ├── qwen_solver.py      # Qwen model interface
+│   ├── ai_solver.py        # AI model interface
 │   └── response_parser.py  # Parse AI responses
 ├── sympy_backend/          # Mathematical verification
 │   ├── expression_parser.py # Enhanced math parsing
@@ -103,8 +110,8 @@ Logikos/
 - Detailed step-by-step solving process
 - LaTeX output generation
 
-#### 3. AI Integration (`ai/qwen_solver.py`)
-- Interface to Qwen 2.5 32B model via Ollama
+#### 3. AI Integration (`ai/ai_solver.py`)
+- Interface to AI models via Ollama (currently Nemotron)
 - Contextual prompts for different problem types
 - Graceful fallback when AI unavailable
 
@@ -168,7 +175,7 @@ pytest tests/ -v
 
 #### New AI Models
 1. Create new solver class in `ai/` directory
-2. Implement same interface as `QwenSolver`
+2. Implement same interface as `AISolver`
 3. Update `run_workflow.py` to support new model
 
 ## Troubleshooting

@@ -166,7 +166,14 @@ class MathVizPipeline:
                     result["interactive_graph"] = interactive_result
                     result["desmos_url"] = interactive_result.graph_url
                     result["graph_html"] = interactive_result.graph_html
-                    
+
+                    # CRITICAL: Set the visualization field for frontend display
+                    if interactive_result.graph_html:
+                        # Update the solution object's visualization field
+                        if hasattr(solution, '__dict__'):
+                            solution.visualization = interactive_result.graph_html
+                        logger.info("Contour visualization set for frontend display")
+
                     logger.info("Interactive graph generated successfully")
                 else:
                     logger.warning("Interactive graph generation failed")
@@ -245,11 +252,12 @@ class MathVizPipeline:
                 for step_dict in solution.solution_steps:
                     if isinstance(step_dict, dict):
                         step = Step(
-                            step_id=step_dict.get('step_id', 0),
+                            step_id=str(step_dict.get('step_id', 0)),
+                            description=step_dict.get('description', step_dict.get('operation', 'Mathematical operation')),
                             operation=step_dict.get('operation', 'unknown'),
-                            expression_before=step_dict.get('expression_before', ''),
-                            expression_after=step_dict.get('expression_after', ''),
-                            justification=step_dict.get('justification', '')
+                            input_state={"expression": step_dict.get('expression_before', '')},
+                            output_state={"expression": step_dict.get('expression_after', '')},
+                            reasoning=step_dict.get('justification', step_dict.get('reasoning', ''))
                         )
                         trace.add_step(step)
                 

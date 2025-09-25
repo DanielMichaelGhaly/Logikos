@@ -264,13 +264,58 @@ class Visualizer:
     
     def _is_multivariable_function(self, expression: str) -> bool:
         """Check if expression contains multiple variables for 3D or contour plotting."""
+        logger.info(f"Checking if expression is multivariable: {expression}")
+
         try:
-            expr = sp.sympify(expression)
+            # Clean up the expression first
+            cleaned_expr = expression.strip()
+
+            # Remove common prefixes
+            cleaned_expr = re.sub(r"^\s*plot\s+", "", cleaned_expr, flags=re.IGNORECASE)
+            cleaned_expr = re.sub(r"^\s*contour\s+", "", cleaned_expr, flags=re.IGNORECASE)
+            cleaned_expr = re.sub(r"^\s*graph\s+", "", cleaned_expr, flags=re.IGNORECASE)
+            cleaned_expr = re.sub(r"^\s*(contour\s+)?map\s+of\s+", "", cleaned_expr, flags=re.IGNORECASE)
+
+            # Try SymPy parsing first
+            expr = sp.sympify(cleaned_expr)
             variables = expr.free_symbols
-            return len(variables) >= 2
-        except:
-            # Simple heuristic check
-            return 'y' in expression.lower() and 'x' in expression.lower()
+            var_count = len(variables)
+            logger.info(f"SymPy detected {var_count} variables: {[str(v) for v in variables]}")
+
+            if var_count >= 2:
+                return True
+
+        except Exception as e:
+            logger.warning(f"SymPy parsing failed: {e}, trying heuristic detection")
+
+        # Enhanced heuristic checks for common patterns
+        expr_lower = expression.lower()
+
+        # Check for common 2-variable patterns
+        patterns = [
+            r'\bx\b.*\by\b',  # x followed by y anywhere
+            r'\by\b.*\bx\b',  # y followed by x anywhere
+            r'\bx\s*[\+\-\*/\^]\s*y',  # x operator y
+            r'\by\s*[\+\-\*/\^]\s*x',  # y operator x
+            r'\bx\s*\*\s*y',  # x*y
+            r'\bsin\s*\(\s*x\s*\).*cos\s*\(\s*y\s*\)',  # sin(x)*cos(y)
+            r'\bcos\s*\(\s*x\s*\).*sin\s*\(\s*y\s*\)',  # cos(x)*sin(y)
+            r'\bx\s*\*\*?\s*2.*y\s*\*\*?\s*2',  # x^2 + y^2 style
+            r'\by\s*\*\*?\s*2.*x\s*\*\*?\s*2',  # y^2 + x^2 style
+        ]
+
+        for pattern in patterns:
+            if re.search(pattern, expr_lower):
+                logger.info(f"Heuristic pattern matched: {pattern}")
+                return True
+
+        # Check if both x and y appear as separate variables
+        has_x = bool(re.search(r'\bx\b', expr_lower))
+        has_y = bool(re.search(r'\by\b', expr_lower))
+
+        result = has_x and has_y
+        logger.info(f"Final multivariable detection result: {result} (has_x: {has_x}, has_y: {has_y})")
+        return result
     
     def _generate_derivative_graph(self, expressions: List[str], config: GraphConfig) -> Optional[VisualizationResult]:
         """Generate graph for derivative problems."""

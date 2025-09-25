@@ -261,23 +261,35 @@ export const MathVizChat: React.FC = () => {
     {
       id: '1',
       type: 'bot',
-      content: "👋 Hello! I'm your AI-powered math tutor. I can solve equations, find derivatives, compute integrals, and create interactive graphs. What would you like to learn today?",
+      content: "Hello! I'm your AI-powered math tutor. I can solve equations, find derivatives, compute integrals, and create interactive graphs. What would you like to learn today?",
       timestamp: new Date(),
       has_solution: false
     }
   ]);
-  
+
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, autoScroll]);
+
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setAutoScroll(isNearBottom);
+    }
+  };
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -315,7 +327,7 @@ export const MathVizChat: React.FC = () => {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        content: `🤔 I encountered an issue solving that problem: **${error instanceof Error ? error.message : 'Unknown error'}**\n\nCould you try rephrasing it or asking a different question? I'm here to help!`,
+        content: `I encountered an issue solving that problem: **${error instanceof Error ? error.message : 'Unknown error'}**\n\nCould you try rephrasing it or asking a different question? I'm here to help!`,
         timestamp: new Date(),
         has_solution: false
       };
@@ -343,12 +355,12 @@ export const MathVizChat: React.FC = () => {
       <Sidebar>
         <Brand>∞ Logikos</Brand>
         <NavSection>
-          <NavItem>💬 Chats</NavItem>
+          <NavItem>Chats</NavItem>
         </NavSection>
         <div style={{ flex: 1 }} />
         <NavSection>
-          <NavItem>⚙️ Settings</NavItem>
-          <NavItem>↩️ Log Out</NavItem>
+          <NavItem>Settings</NavItem>
+          <NavItem>Log Out</NavItem>
         </NavSection>
       </Sidebar>
 
@@ -363,7 +375,7 @@ export const MathVizChat: React.FC = () => {
           <Subtitle>Your AI-powered mathematical companion with step-by-step solutions</Subtitle>
         </Header>
 
-        <MessagesContainer>
+        <MessagesContainer ref={messagesContainerRef} onScroll={handleScroll}>
           <AnimatePresence>
             {messages.map((message) => (
               <motion.div
@@ -424,7 +436,7 @@ export const MathVizChat: React.FC = () => {
           {showSuggestions && (
             <div>
               <h3 style={{ marginBottom: '1rem', color: 'rgba(226,232,240,0.85)', fontWeight: 700 }}>
-                💡 Try these examples:
+                Try these examples:
               </h3>
               <SuggestionsGrid>
                 {suggestions.map((suggestion, index) => (

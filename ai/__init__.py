@@ -4,7 +4,7 @@ AI Processing Module
 Handles interactions with AI models for mathematical problem solving.
 """
 
-from .qwen_solver import QwenSolver, AIResponse
+from .ai_solver import AISolver, AIResponse
 from .response_parser import ResponseParser
 
-__all__ = ['QwenSolver', 'AIResponse', 'ResponseParser']
+__all__ = ['AISolver', 'AIResponse', 'ResponseParser']

@@ -124,12 +124,26 @@ async def chat(request: ChatRequest):
     attempts = 0
     last_error: Optional[str] = None
     solution_obj = None
+    enhanced_result = None
+
     while attempts < 2 and solution_obj is None:
         try:
-            solution_obj = pipeline.process(normalized_text)
+            # Use process_with_graph_config to get both solution and visualization
+            if request.include_visualization:
+                result = pipeline.process_with_graph_config(normalized_text)
+                solution_obj = result.get("solution")
+                enhanced_result = result  # The entire result contains desmos_url and other graph data
+                print(f"Got result with visualization: {list(result.keys()) if result else None}")
+            else:
+                # Basic processing without visualization
+                solution_obj = pipeline.process(normalized_text)
+                enhanced_result = None
+
         except Exception as e:
             last_error = str(e)
             solution_obj = None
+            print(f"Pipeline processing error: {e}")
+
         if solution_obj is None:
             attempts += 1
             if ai_provider is not None:
@@ -163,6 +177,27 @@ async def chat(request: ChatRequest):
             "visualization": solution_obj.visualization,
             "metadata": solution_obj.metadata or {},
         }
+
+        # Integrate enhanced visualization if available
+        if enhanced_result:
+            print(f"Integrating enhanced visualization data: {type(enhanced_result)}")
+            if isinstance(enhanced_result, dict):
+                # If enhanced_result has graph_html, add it to visualization and metadata
+                if enhanced_result.get('graph_html'):
+                    solution_dict["visualization"] = enhanced_result['graph_html']
+                    solution_dict["metadata"]["graph_html"] = enhanced_result['graph_html']
+                    print(f"Added graph_html to solution (length: {len(enhanced_result['graph_html'])})")
+
+                # Add any other enhanced data to metadata
+                for key, value in enhanced_result.items():
+                    if key not in solution_dict["metadata"]:
+                        solution_dict["metadata"][key] = value
+            else:
+                # If enhanced_result is a string (HTML), use it directly
+                if isinstance(enhanced_result, str) and enhanced_result.strip():
+                    solution_dict["visualization"] = enhanced_result
+                    solution_dict["metadata"]["graph_html"] = enhanced_result
+                    print(f"Added enhanced result as visualization (length: {len(enhanced_result)})")
 
 
         # Enhance reasoning via AI provider if requested
@@ -348,10 +383,10 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     
-    print("🚀 Starting MathViz API server...")
-    print(f"📊 MathViz Pipeline Available: {MATHVIZ_AVAILABLE}")
-    print("🌐 API will be available at: http://localhost:8000")
-    print("📚 API docs will be available at: http://localhost:8000/docs")
+    print("Starting MathViz API server...")
+    print(f"MathViz Pipeline Available: {MATHVIZ_AVAILABLE}")
+    print("API will be available at: http://localhost:8000")
+    print("API docs will be available at: http://localhost:8000/docs")
     
     uvicorn.run(
         "main:app",

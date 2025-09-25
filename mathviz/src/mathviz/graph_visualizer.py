@@ -322,49 +322,6 @@ class GraphVisualizer:
         self.geogebra = GeoGebraAPI()
         self.function_plot = FunctionPlotGenerator()
 
-    def visualize_contour(self, expression: str, variables: list = None, config: GraphConfig = None, levels: int = 10) -> VisualizationResult:
-        """Visualize a contour map for a function of two variables using Plotly."""
-        try:
-            if config is None:
-                config = GraphConfig()
-            expr = sp.sympify(expression)
-            if variables is None:
-                variables = list(expr.free_symbols)
-                variables = [str(v) for v in sorted(variables, key=str)[:2]]
-            if len(variables) < 2:
-                return VisualizationResult(
-                    success=False,
-                    error="Need at least 2 variables for contour visualization"
-                )
-            x_vals = np.linspace(config.x_range[0], config.x_range[1], 100)
-            y_vals = np.linspace(config.y_range[0], config.y_range[1], 100)
-            X, Y = np.meshgrid(x_vals, y_vals)
-            sym_vars = [sp.Symbol(var) for var in variables[:2]]
-            func = sp.lambdify(sym_vars, expr, 'numpy')
-            Z = func(X, Y)
-            fig = go.Figure(data=go.Contour(z=Z, x=x_vals, y=y_vals, colorscale='Viridis', ncontours=levels))
-            fig.update_layout(
-                title=f'Contour Map of {expression}',
-                xaxis_title=variables[0],
-                yaxis_title=variables[1],
-                width=800,
-                height=600
-            )
-            html = fig.to_html(include_plotlyjs='cdn')
-            return VisualizationResult(
-                success=True,
-                graph_html=html,
-                metadata={
-                    "expression": expression,
-                    "variables": variables,
-                    "plot_type": "contour_map"
-                }
-            )
-        except Exception as e:
-            return VisualizationResult(
-                success=False,
-                error=f"Error creating contour map: {str(e)}"
-            )
     
     def visualize_function(self, expression: str, config: GraphConfig = None,
                           provider: str = "auto") -> VisualizationResult:
@@ -421,24 +378,50 @@ class GraphVisualizer:
         
         return combined_result
     
-    def visualize_contour(self, expression: str, config: GraphConfig = None) -> VisualizationResult:
+    def visualize_contour(self, expression: str, variables: list = None, config: GraphConfig = None, levels: int = 10) -> VisualizationResult:
         """Visualize a contour map for a function of two variables using Gnuplot if available, else Plotly."""
         try:
             import shutil
             if config is None:
                 config = GraphConfig()
+
+            logger.info(f"Generating contour map for expression: {expression}")
+
+            # Parse expression and detect variables
+            expr = sp.sympify(expression)
+            if variables is None:
+                variables = list(expr.free_symbols)
+                variables = [str(v) for v in sorted(variables, key=str)[:2]]
+                logger.info(f"Auto-detected variables: {variables}")
+
+            if len(variables) < 2:
+                return VisualizationResult(
+                    success=False,
+                    error=f"Need at least 2 variables for contour visualization, found: {variables}"
+                )
+
             # Check if gnuplot is available
             gnuplot_path = shutil.which('gnuplot')
+            logger.info(f"Gnuplot path: {gnuplot_path}")
+
             if gnuplot_path:
                 # Use Gnuplot for lightweight contour plotting
                 import tempfile, os
-                x, y = sp.symbols('x y')
-                expr = sp.sympify(expression)
-                x_vals = np.linspace(config.x_range[0], config.x_range[1], config.resolution)
-                y_vals = np.linspace(config.y_range[0], config.y_range[1], config.resolution)
+                logger.info("Using gnuplot for contour generation")
+
+                # Use the detected variables instead of hardcoded x, y
+                var_symbols = [sp.Symbol(var) for var in variables[:2]]
+                x_vals = np.linspace(config.x_range[0], config.x_range[1], min(config.resolution, 100))
+                y_vals = np.linspace(config.y_range[0], config.y_range[1], min(config.resolution, 100))
                 X, Y = np.meshgrid(x_vals, y_vals)
-                f_lambd = sp.lambdify((x, y), expr, modules=['numpy'])
-                Z = f_lambd(X, Y)
+
+                try:
+                    f_lambd = sp.lambdify(var_symbols, expr, modules=['numpy'])
+                    Z = f_lambd(X, Y)
+                    logger.info(f"Successfully computed function values for contour plot")
+                except Exception as e:
+                    logger.error(f"Failed to compute function values: {e}")
+                    raise
                 # Write data to temp file
                 with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.dat') as datafile:
                     for i in range(len(x_vals)):
@@ -451,12 +434,27 @@ class GraphVisualizer:
                     scriptfile.write(f"set term pngcairo size 800,600\n")
                     scriptfile.write(f"set output '{scriptfile.name}.png'\n")
                     scriptfile.write(f"set title 'Contour map of {expression}'\n")
-                    scriptfile.write(f"set xlabel 'x'\nset ylabel 'y'\n")
-                    scriptfile.write(f"set contour base\nset view map\nsplot '{datafile_path}' with lines\n")
+                    scriptfile.write(f"set xlabel '{variables[0]}'\nset ylabel '{variables[1]}'\n")
+                    scriptfile.write(f"set contour base\nset view map\n")
+                    scriptfile.write(f"set cntrparam levels {levels}\n")
+                    scriptfile.write(f"splot '{datafile_path}' with lines\n")
                     scriptfile_path = scriptfile.name
-                # Run gnuplot
+
+                # Run gnuplot with proper error handling
                 import subprocess
-                subprocess.run([gnuplot_path, scriptfile_path], check=True)
+                try:
+                    result = subprocess.run([gnuplot_path, scriptfile_path],
+                                         check=True,
+                                         capture_output=True,
+                                         text=True,
+                                         timeout=30)
+                    logger.info("Gnuplot executed successfully")
+                except subprocess.TimeoutExpired:
+                    logger.error("Gnuplot execution timed out")
+                    raise Exception("Gnuplot execution timed out after 30 seconds")
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Gnuplot execution failed: {e.stderr}")
+                    raise Exception(f"Gnuplot failed: {e.stderr}")
                 # Read image
                 img_path = scriptfile_path + '.png'
                 with open(img_path, 'rb') as imgf:
@@ -476,21 +474,47 @@ class GraphVisualizer:
                 )
             else:
                 # Fallback to Plotly
-                x, y = sp.symbols('x y')
-                expr = sp.sympify(expression)
-                x_vals = np.linspace(config.x_range[0], config.x_range[1], config.resolution)
-                y_vals = np.linspace(config.y_range[0], config.y_range[1], config.resolution)
+                logger.info("Gnuplot not available, falling back to Plotly")
+                var_symbols = [sp.Symbol(var) for var in variables[:2]]
+                x_vals = np.linspace(config.x_range[0], config.x_range[1], min(config.resolution, 100))
+                y_vals = np.linspace(config.y_range[0], config.y_range[1], min(config.resolution, 100))
                 X, Y = np.meshgrid(x_vals, y_vals)
-                f_lambd = sp.lambdify((x, y), expr, modules=['numpy'])
-                Z = f_lambd(X, Y)
-                fig = go.Figure(data=go.Contour(z=Z, x=x_vals, y=y_vals, colorscale='Viridis'))
-                fig.update_layout(title=f"Contour map of {expression}", xaxis_title="x", yaxis_title="y")
-                graph_html = fig.to_html(full_html=False)
-                return VisualizationResult(
-                    success=True,
-                    graph_html=graph_html,
-                    metadata={"expression": expression, "type": "contour", "engine": "plotly"}
-                )
+
+                try:
+                    f_lambd = sp.lambdify(var_symbols, expr, modules=['numpy'])
+                    Z = f_lambd(X, Y)
+
+                    fig = go.Figure(data=go.Contour(
+                        z=Z,
+                        x=x_vals,
+                        y=y_vals,
+                        colorscale='Viridis',
+                        ncontours=levels
+                    ))
+                    fig.update_layout(
+                        title=f"Contour map of {expression}",
+                        xaxis_title=variables[0],
+                        yaxis_title=variables[1],
+                        width=800,
+                        height=600
+                    )
+                    graph_html = fig.to_html(include_plotlyjs='cdn')
+                    logger.info("Plotly contour map generated successfully")
+
+                    return VisualizationResult(
+                        success=True,
+                        graph_html=graph_html,
+                        metadata={
+                            "expression": expression,
+                            "variables": variables,
+                            "type": "contour",
+                            "engine": "plotly",
+                            "levels": levels
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Plotly fallback failed: {e}")
+                    raise
         except Exception as e:
             return VisualizationResult(success=False, error=f"Error generating contour map: {str(e)}")
     

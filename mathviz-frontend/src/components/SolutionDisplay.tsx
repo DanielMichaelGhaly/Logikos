@@ -6,12 +6,13 @@ import { InlineMath, BlockMath } from "react-katex";
 import { MathSolution, MathStep, LegacyStep } from "../types/mathviz";
 
 const SolutionContainer = styled(motion.div)`
-  background: #f9fafb;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.90));
   border-radius: 16px;
   padding: 1.5rem;
   margin: 1rem 0;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(3, 8, 20, 0.3);
+  backdrop-filter: blur(10px);
 `;
 
 const FinalAnswer = styled(motion.div)`
@@ -49,7 +50,7 @@ const StepsHeader = styled.div`
 const StepsTitle = styled.h3`
   font-weight: 700;
   font-size: 1rem;
-  color: #e5e7eb;
+  color: #1f2937;
   margin: 0;
   display: flex;
   align-items: center;
@@ -247,19 +248,32 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({
 
   // Render HTML visualization if present (e.g., contour map, plotly, gnuplot)
   const renderVisualization = () => {
+    // First check for direct visualization HTML (contour maps, etc.)
     if (
       solution.visualization &&
       typeof solution.visualization === "string" &&
       solution.visualization.includes("<")
     ) {
+      console.log("🎨 Rendering direct visualization HTML");
       return (
-        <div style={{ margin: "2rem 0", textAlign: "center" }}>
+        <div style={{ margin: "2rem 0", textAlign: "center", maxWidth: "100%", overflow: "auto" }}>
           <div dangerouslySetInnerHTML={{ __html: solution.visualization }} />
         </div>
       );
     }
-    // Optionally support graph_html in metadata (type safe)
+
+    // Check for graph_html in metadata from mathviz pipeline
     const meta = solution.metadata as any;
+    if (meta && meta.graph_html && typeof meta.graph_html === "string") {
+      console.log("🎨 Rendering graph_html from metadata");
+      return (
+        <div style={{ margin: "2rem 0", textAlign: "center", maxWidth: "100%", overflow: "auto" }}>
+          <div dangerouslySetInnerHTML={{ __html: meta.graph_html }} />
+        </div>
+      );
+    }
+
+    // Legacy support for interactive_visualization structure
     if (
       meta &&
       meta.interactive_visualization &&
@@ -267,13 +281,15 @@ export const SolutionDisplay: React.FC<SolutionDisplayProps> = ({
     ) {
       const html = meta.interactive_visualization.graph_html;
       if (html) {
+        console.log("🎨 Rendering legacy interactive_visualization HTML");
         return (
-          <div style={{ margin: "2rem 0", textAlign: "center" }}>
+          <div style={{ margin: "2rem 0", textAlign: "center", maxWidth: "100%", overflow: "auto" }}>
             <div dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         );
       }
     }
+
     return null;
   };
 
