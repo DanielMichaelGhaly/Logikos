@@ -49,7 +49,7 @@ const StepsHeader = styled.div`
 const StepsTitle = styled.h3`
   font-weight: 700;
   font-size: 1rem;
-  color: #e5e7eb;
+  color: #1f2937;
   margin: 0;
   display: flex;
   align-items: center;
