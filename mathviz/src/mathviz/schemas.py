@@ -39,3 +39,7 @@ class MathSolution(BaseModel):
     reasoning: str
     visualization: str  # LaTeX or HTML
     metadata: Optional[Dict[str, Any]] = None
+    trace: Optional[Any] = None  # StepTrace object from solver
+    
+    class Config:
+        arbitrary_types_allowed = True  # Allow non-Pydantic types like StepTrace
