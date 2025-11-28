@@ -1,263 +1,220 @@
-# Logikos
+=======
+# Logikos - AI-Enhanced Mathematical Problem Solver
 
-# MathViz
+**🔧 Restructured Architecture** - Clean separation of AI, SymPy verification, and visualization components for better collaboration and maintainability.
 
-A comprehensive mathematical problem visualization and solving pipeline that transforms natural language math problems into structured solutions with step-by-step reasoning and visual output.
+## Overview
 
-## 🎯 Overview
+Logikos combines AI-powered mathematical explanations with SymPy's symbolic computation for accurate and educational problem solving. The system provides:
 
-MathViz provides an end-to-end pipeline for processing mathematical problems:
+- **🤖 AI Explanations**: Step-by-step solutions using Nemotron model
+- **🔢 SymPy Verification**: Mathematical accuracy guaranteed by symbolic computation
+- **✅ Cross-Validation**: AI solutions are automatically verified against SymPy results
+- **📊 Rich Visualization**: LaTeX formatting and interactive displays
 
-- **Natural Language Parsing**: Convert plain English math problems into structured schemas
-- **Input Validation**: Sanity checks and constraint verification for problem inputs
-- **Symbolic Solving**: Ground-truth solutions using SymPy/NumPy with complete step tracing
-- **Reasoning Generation**: Human-readable explanations from solution traces
-- **Visual Output**: LaTeX and HTML formatting for professional presentation
+## Quick Start
 
-## ✨ Features
+### Prerequisites
+- Python 3.8+
+- Virtual environment (recommended)
+- Ollama (for AI features, optional)
 
-- **Multi-Domain Support**: Handles algebraic equations, calculus problems, and optimization tasks
-- **Step-by-Step Tracing**: Complete audit trail of every transformation in the solution process
-- **Type-Safe Schemas**: Pydantic models ensure data integrity throughout the pipeline
-- **Extensible Architecture**: Modular design allows easy addition of new problem types
-- **Multiple Output Formats**: Generate LaTeX for academic papers or HTML for web display
+### Installation
 
-## 🏗️ Architecture
+1. **Activate virtual environment**:
+   ```bash
+   source .venv/bin/activate
+   ```
 
-```
-mathviz/
-├─ pyproject.toml      # Project configuration and dependencies
-├─ README.md           # Documentation
-└─ src/
-   └─ mathviz/
-      ├─ __init__.py        # Package initialization
-      ├─ pipeline.py        # Main orchestration logic
-      ├─ schemas.py         # Pydantic problem/solution models
-      ├─ parser.py          # NL → structured schema conversion
-      ├─ validator.py       # Problem validation and sanity checks
-      ├─ solver.py          # SymPy/NumPy solver with tracing
-      ├─ trace.py           # Step & StepTrace dataclasses
-      ├─ reasoning.py       # Natural language step generation
-      └─ viz.py             # LaTeX/HTML visualization
-```
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## 📦 Installation
+3. **Start the application**:
+   ```bash
+   # Command-line interface
+   ./start.sh
 
-### Basic Installation
+   # Or test directly
+   python run_workflow.py "solve 2x+5=0" --no-ai
 
+   # Full web application (if available)
+   ./start.sh --full-app
+   ```
+
+## Usage Examples
+
+### Basic Problem Solving
 ```bash
-pip install -e .
+# Solve algebraic equations
+python run_workflow.py "solve 2x+5=0"
+
+# Find roots of polynomials  
+python run_workflow.py "find roots of x^2-4"
+
+# Calculus operations
+python run_workflow.py "derivative of x^2 + 3x"
+python run_workflow.py "integral of sin(x)"
+
+# Expression simplification
+python run_workflow.py "simplify (x^2-1)/(x-1)"
 ```
 
-### Development Installation
-
+### Advanced Options
 ```bash
-pip install -e .[dev]
+# Disable AI (SymPy only)
+python run_workflow.py "solve x^2-9=0" --no-ai
+
+# Verbose output with detailed steps
+python run_workflow.py "derivative of cos(x)" --verbose
+
+# Save HTML visualization
+python run_workflow.py "solve 3x-7=0" --save-html solution.html
+
+# Save JSON results  
+python run_workflow.py "integral of x^2" --save-json results.json
 ```
 
-### Requirements
+## Architecture
 
-- Python >= 3.8
-- pydantic >= 2.0.0
-- sympy >= 1.12
-- numpy >= 1.24.0
-
-## 🚀 Quick Start
-
-### Basic Usage
-
-```python
-from mathviz import MathVizPipeline
-
-# Initialize the pipeline
-pipeline = MathVizPipeline()
-
-# Solve a simple equation
-problem = "Solve for x: 2x + 5 = 13"
-result = pipeline.process(problem)
-
-# Access results
-print("Solution:", result.final_answer)
-print("Steps:", result.solution_steps)
-print("Reasoning:", result.reasoning)
-print("LaTeX:", result.visualization)
+```
+Logikos/
+├── run_workflow.py          # Main entry point
+├── requirements.txt         # Dependencies
+├── README.md               # This file
+├── ai/                     # AI processing components
+│   ├── ai_solver.py        # AI model interface
+│   └── response_parser.py  # Parse AI responses
+├── sympy_backend/          # Mathematical verification
+│   ├── expression_parser.py # Enhanced math parsing
+│   ├── solver.py          # SymPy solving logic
+│   └── verifier.py        # AI/SymPy cross-validation
+├── visualization/          # Display and formatting
+│   ├── latex_formatter.py # LaTeX output
+│   └── step_visualizer.py # Step-by-step display
+└── tests/                 # Integration tests
+    └── test_integration.py
 ```
 
-### Advanced Usage
+### Key Components
 
-```python
-from mathviz import MathParser, MathSolver, Visualizer
-from mathviz.schemas import MathProblem, Variable, Equation
+#### 1. Enhanced Math Parser (`sympy_backend/expression_parser.py`)
+**✅ FIXED**: Now correctly handles natural language input like "solve 2x+5=0"
 
-# Manual problem construction
-problem = MathProblem(
-    problem_text="Find the derivative of x^2 + 3x",
-    problem_type="calculus",
-    variables=[Variable(name="x", domain="real")],
-    equations=[],
-    goal="differentiate expression"
-)
+- Converts natural language to SymPy expressions
+- Supports various input formats (equations, derivatives, integrals)
+- Robust preprocessing for mathematical notation
 
-# Solve and visualize
-solver = MathSolver()
-solution = solver.solve(problem)
+#### 2. SymPy Solver (`sympy_backend/solver.py`) 
+- Pure symbolic computation for mathematical accuracy
+- Detailed step-by-step solving process
+- LaTeX output generation
 
-visualizer = Visualizer()
-latex_output = visualizer.generate_latex(solution.trace)
+#### 3. AI Integration (`ai/ai_solver.py`)
+- Interface to AI models via Ollama (currently Nemotron)
+- Contextual prompts for different problem types
+- Graceful fallback when AI unavailable
+
+#### 4. Verification System (`sympy_backend/verifier.py`)
+**✅ NEW**: Cross-validates AI solutions against SymPy results
+
+- Extracts numerical solutions from AI responses
+- Compares against SymPy results with tolerance
+- Confidence scoring and error detection
+
+## Problem Types Supported
+
+| Type | Example Input | SymPy Support | AI Support |
+|------|---------------|---------------|------------|
+| **Linear Equations** | `solve 2x+5=0` | ✅ | ✅ |
+| **Quadratic Equations** | `solve x^2-4=0` | ✅ | ✅ |
+| **Root Finding** | `find roots of x^3-8` | ✅ | ✅ |
+| **Derivatives** | `derivative of x^2+sin(x)` | ✅ | ✅ |
+| **Integrals** | `integral of cos(x)` | ✅ | ✅ |
+| **Simplification** | `simplify (x^2-1)/(x-1)` | ✅ | ✅ |
+
+## Verification System
+
+The system automatically cross-validates AI solutions:
+
+```
+🤖 AI: "x = -2.5"
+🔢 SymPy: [-5/2]
+✅ Verification: MATCH (confidence: 0.95)
 ```
 
-## 📚 Supported Problem Types
+Status indicators:
+- ✅ **MATCH**: AI solution matches SymPy exactly
+- ❌ **MISMATCH**: Solutions differ (potential AI error)
+- ⚠️ **PARTIAL_MATCH**: Similar but not exact
+- ❓ **INCONCLUSIVE**: Cannot verify (complex expressions)
 
-### Algebraic Equations
-```python
-pipeline.process("Solve for x: 3x - 7 = 2x + 5")
-pipeline.process("Find x: x^2 - 4x + 4 = 0")
-```
-
-### Calculus Problems
-```python
-pipeline.process("Find the derivative of x^3 + 2x^2")
-pipeline.process("Integrate x^2 from 0 to 5")
-```
-
-### Optimization
-```python
-pipeline.process("Maximize f(x) = -x^2 + 4x + 1")
-```
-
-## 🔧 Core Components
-
-### Parser (`parser.py`)
-Converts natural language to structured schemas using regex patterns and rule-based extraction.
-
-**Key Features:**
-- Equation extraction with multiple pattern matching
-- Variable identification (single letters and LaTeX)
-- Problem type classification
-- Goal extraction
-
-### Validator (`validator.py`)
-Performs sanity checks on problem structure and constraints.
-
-**Validation Steps:**
-- Variable domain verification
-- Equation consistency checks
-- Constraint feasibility analysis
-
-### Solver (`solver.py`)
-Computes ground-truth solutions using SymPy symbolic mathematics.
-
-**Capabilities:**
-- Symbolic equation solving
-- Numerical computation fallback
-- Complete step tracing
-- Error handling and recovery
-
-### Trace System (`trace.py`)
-Records every transformation in the solution process.
-
-**Step Tracking:**
-- Operation type (add, multiply, substitute, etc.)
-- Expression before/after transformation
-- Mathematical justification
-- Metadata for debugging
-
-### Reasoning Generator (`reasoning.py`)
-Converts solution traces into human-readable explanations.
-
-**Output Style:**
-- Natural language descriptions
-- Mathematical justifications
-- Pedagogical clarity
-
-### Visualizer (`viz.py`)
-Renders solutions in professional formats.
-
-**Output Formats:**
-- LaTeX for academic papers
-- HTML for web display
-- Step-by-step presentation
-
-## 📊 Data Models
-
-### MathProblem
-```python
-{
-    "problem_text": "Solve for x: 2x + 5 = 13",
-    "problem_type": "algebraic",
-    "variables": [{"name": "x", "domain": "real"}],
-    "equations": [{"left_side": "2x + 5", "right_side": "13"}],
-    "goal": "solve for x"
-}
-```
-
-### MathSolution
-```python
-{
-    "problem": MathProblem(...),
-    "solution_steps": [...],
-    "final_answer": {"x": 4},
-    "reasoning": "Step-by-step explanation...",
-    "visualization": "LaTeX or HTML output"
-}
-```
-
-## 🧪 Development
+## Development
 
 ### Running Tests
-
 ```bash
-pytest
+# Basic integration test
+python tests/test_integration.py
+
+# Full test suite (if pytest installed)
+pytest tests/ -v
 ```
 
-### Code Formatting
+### Project Structure Benefits
+- **🔧 Modular**: Each component can be developed independently
+- **🧰 Testable**: Clear interfaces enable comprehensive testing
+- **🚀 Scalable**: Easy to add new AI models or math operations
+- **👥 Collaborative**: Team members can work on specific components
 
-```bash
-black src/
-```
+### Adding New Features
 
-### Type Checking
+#### New Math Operations
+1. Add parsing patterns to `sympy_backend/expression_parser.py`
+2. Implement solver logic in `sympy_backend/solver.py`
+3. Add verification patterns to `sympy_backend/verifier.py`
 
-```bash
-mypy src/
-```
+#### New AI Models
+1. Create new solver class in `ai/` directory
+2. Implement same interface as `AISolver`
+3. Update `run_workflow.py` to support new model
 
-### Linting
+## Troubleshooting
 
-```bash
-ruff check src/
-```
+### Common Issues
 
-## 🛣️ Roadmap
+**"SymPy error: Sympify of expression 'could not parse'"**
+- ✅ **FIXED**: Enhanced parser now handles natural language input
+- Use proper mathematical notation: `2*x` instead of `2x` in complex expressions
 
-- [ ] Complete solver implementation for all problem types
-- [ ] Enhanced reasoning generation with templates
-- [ ] Interactive HTML visualizations
-- [ ] Support for systems of equations
-- [ ] Matrix operations and linear algebra
-- [ ] Graphing capabilities for functions
-- [ ] API endpoint for web integration
-- [ ] CLI tool for command-line usage
+**"Ollama service not available"**
+- Start Ollama: `ollama serve`
+- Or use `--no-ai` flag for SymPy-only mode
 
-## 🤝 Contributing
+**Import errors**
+- Ensure virtual environment is activated: `source .venv/bin/activate`
+- Install dependencies: `pip install -r requirements.txt`
 
-Contributions are welcome! Areas for improvement:
+### Getting Help
+- Check the integration tests for usage examples
+- Use `--verbose` flag for detailed debugging output
+- Each component has standalone test functions
 
-1. **Parser Enhancement**: Add more sophisticated NLP patterns
-2. **Solver Extensions**: Implement additional problem types
-3. **Visualization**: Create interactive graphs and animations
-4. **Testing**: Expand test coverage for edge cases
-5. **Documentation**: Add more examples and tutorials
+## Original vs. New Architecture
 
+### Before (Issues)
+- ❌ Parser failed on "solve 2x+5=0"
+- ❌ Multiple overlapping scripts and directories
+- ❌ No systematic AI-SymPy verification
+- ❌ Difficult for team collaboration
 
-## 🙏 Acknowledgments
-
-Built with:
-- [SymPy](https://www.sympy.org/) - Symbolic mathematics
-- [NumPy](https://numpy.org/) - Numerical computing
-- [Pydantic](https://pydantic.dev/) - Data validation
-
+### After (Solutions)
+- ✅ Enhanced parser handles natural language
+- ✅ Clean modular architecture
+- ✅ Automatic AI-SymPy cross-validation
+- ✅ Clear separation of concerns for collaboration
 
 ---
 
-**Note**: This project is under active development. Some features are still being implemented (marked with TODO in the codebase).
+**🎯 Ready to use**: The core SymPy functionality works immediately. AI features require Ollama setup but gracefully degrade when unavailable.
+>>>>>>> 4f8d194d9e58e27369b5b7f39aa4fb0455cf55fc

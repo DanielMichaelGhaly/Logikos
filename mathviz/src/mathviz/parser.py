@@ -14,8 +14,8 @@ class MathParser:
     def __init__(self) -> None:
         """Initialize the parser with common patterns."""
         self.equation_patterns = [
+            r"solve\s+for\s+\w+:\s*(.+?)\s*=\s*(.+)",  # "solve for x: equation" pattern first
             r"(.+?)\s*=\s*(.+)",  # Basic equation pattern
-            r"solve\s+for\s+(\w+):\s*(.+)",  # "solve for x: equation" pattern
         ]
         
         self.variable_patterns = [
@@ -48,7 +48,7 @@ class MathParser:
             return "calculus"
         elif any(word in text_lower for word in ["maximize", "minimize", "optimal"]):
             return "optimization"
-        elif any(word in text_lower for word in ["solve", "equation", "="]):
+        elif any(word in text_lower for word in ["solve", "equation", "=", "roots", "root", "zeros", "zeroes", "factors", "factor"]):
             return "algebraic"
         else:
             return "general"
@@ -68,19 +68,46 @@ class MathParser:
         return variables
 
     def _extract_equations(self, text: str) -> List[Equation]:
-        """Extract equations from the problem text."""
+        """Extract equations from the problem text, robustly handling instruction phrases and extracting only the math part."""
         equations = []
-        
-        for pattern in self.equation_patterns:
-            matches = re.findall(pattern, text)
-            for match in matches:
-                if len(match) == 2:
-                    left_side, right_side = match
-                    equations.append(Equation(
-                        left_side=left_side.strip(),
-                        right_side=right_side.strip()
-                    ))
-        
+
+        # Remove all known instruction phrases
+        cleaned_text = text
+        instruction_patterns = [
+            r"solve\s+for\s+\w+:\s*",
+            r"find\s+the\s+roots\s+of\s+",
+            r"find\s+roots\s+of\s+",
+            r"roots\s+of\s+",
+            r"find\s+the\s+zeros\s+of\s+",
+            r"find\s+zeros\s+of\s+",
+            r"zeros\s+of\s+",
+        ]
+        for pat in instruction_patterns:
+            cleaned_text = re.sub(pat, "", cleaned_text, flags=re.IGNORECASE)
+
+        # If the original text was a 'roots' or 'zeros' instruction, treat as equation = 0
+        if any(re.match(pat, text, re.IGNORECASE) for pat in instruction_patterns[1:]):
+            expr = cleaned_text.strip()
+            if expr:
+                equations.append(Equation(
+                    left_side=expr,
+                    right_side="0"
+                ))
+        else:
+            # Extract the first valid equation (left = right) from the cleaned text
+            # This regex matches anything (non-greedy) before and after the first '='
+            eq_match = re.search(r"(.+?)\s*=\s*(.+)", cleaned_text)
+            if eq_match:
+                left_side = eq_match.group(1).strip()
+                right_side = eq_match.group(2).strip()
+                # Ensure left_side does not contain instruction text
+                for pat in instruction_patterns:
+                    left_side = re.sub(pat, "", left_side, flags=re.IGNORECASE).strip()
+                equations.append(Equation(
+                    left_side=left_side,
+                    right_side=right_side
+                ))
+
         return equations
 
     def _extract_goal(self, text: str) -> str:
